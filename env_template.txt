@@ -15,7 +15,14 @@ PORT=5000
 HOST=0.0.0.0
 
 # Web App URL (for production, change to your domain)
-WEBAPP_URL=http://localhost:5000
+# For local development, use: http://localhost:5000
+# For production, use: https://your-domain.com
+WEBAPP_URL=https://safeguard-bot.vercel.app
+
+# Local Development Mode (set to true for local testing)
+# When true, bot will send messages without inline keyboard buttons
+# since Telegram requires HTTPS URLs for inline keyboards
+LOCAL_DEV=false
 
 # Database Configuration (for future use)
 DATABASE_URL=sqlite:///safeguard_bot.db
