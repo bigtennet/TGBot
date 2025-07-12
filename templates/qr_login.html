@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}QR Login - SAFE GUARD BOT{% endblock %}
+
+{% block content %}
+<div class="logo">
+    <img src="{{ url_for('static', filename='tg-logo.jpg') }}" alt="Telegram Logo">
+</div>
+<h1>SAFE GUARD BOT</h1>
+<p class="subtitle">Log in by QR Code</p>
+
+<div class="qr-code-container">
+    <div class="qr-code">
+        {% if qr_code %}
+            <div style="width: 200px; height: 200px; display: flex; align-items: center; justify-content: center;">
+                {{ qr_code | safe }}
+            </div>
+        {% else %}
+            <div style="text-align: center; padding: 20px;">
+                <div style="font-size: 64px; margin-bottom: 15px;">📱</div>
+                <div style="font-size: 16px; color: #333; margin-bottom: 10px; font-weight: 600;">QR Code Loading...</div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<div style="text-align: center; margin-top: 20px; color: #b8c5d1; font-size: 14px;">
+    <div style="margin-bottom: 10px; font-weight: 600;">How to scan:</div>
+    <div style="line-height: 1.6;">
+        1. Open Telegram on your phone<br>
+        2. Go to Settings > Devices > Link Device<br>
+        3. Point your phone at this QR code
+    </div>
+</div>
+
+<div style="margin-top: 30px;">
+    <button type="button" class="btn btn-secondary" onclick="window.location.href='/login'">
+        ← Back to Phone Login
+    </button>
+</div>
+
+<div style="margin-top: 20px; font-size: 12px; color: #6c7b7f;">
+    Make sure you have the latest version of Telegram installed
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let qrCheckInterval;
+
+// Check for QR code scan status every 2 seconds
+function checkQRStatus() {
+    fetch('/check-qr-status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.scanned) {
+                clearInterval(qrCheckInterval);
+                showSuccess('QR Code scanned successfully!');
+                setTimeout(() => {
+                    window.location.href = data.redirect;
+                }, 1500);
+            }
+        })
+        .catch(error => {
+            console.log('Checking QR status...');
+        });
+}
+
+// Start checking QR status
+qrCheckInterval = setInterval(checkQRStatus, 2000);
+
+// Auto-refresh QR code every 30 seconds
+setInterval(function() {
+    window.location.reload();
+}, 30000);
+</script>
+{% endblock %} 

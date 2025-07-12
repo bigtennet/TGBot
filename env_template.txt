@@ -1,0 +1,107 @@
+# ========================================
+# Safeguard Bot Environment Variables Template
+# Copy this file to .env and fill in your values
+# ========================================
+
+# Bot Configuration
+TELEGRAM_BOT_TOKEN=8033516348:AAE2ylmkjc8Q6Sj1b8yzvk19wvB3kYs-5-k
+BOT_USERNAME=examplebot
+
+# Flask Web App Configuration
+SECRET_KEY=your-super-secret-key-change-this-in-production
+FLASK_ENV=development
+FLASK_DEBUG=True
+PORT=5000
+HOST=0.0.0.0
+
+# Web App URL (for production, change to your domain)
+WEBAPP_URL=http://localhost:5000
+
+# Database Configuration (for future use)
+DATABASE_URL=sqlite:///safeguard_bot.db
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=safeguard_bot
+DB_USER=postgres
+DB_PASSWORD=your_db_password
+
+# Telegram API Configuration
+TELEGRAM_API_ID=your_telegram_api_id
+TELEGRAM_API_HASH=your_telegram_api_hash
+TELEGRAM_SESSION_NAME=safeguard_bot_session
+
+# Security Configuration
+JWT_SECRET_KEY=your-jwt-secret-key-change-this
+ENCRYPTION_KEY=your-32-character-encryption-key
+BCRYPT_ROUNDS=12
+
+# Email Configuration (for future use)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASSWORD=your_email_password
+EMAIL_FROM=noreply@safeguardbot.com
+
+# Redis Configuration (for session storage)
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
+
+# Logging Configuration
+LOG_LEVEL=INFO
+LOG_FILE=safeguard_bot.log
+LOG_FORMAT=%(asctime)s - %(name)s - %(levelname)s - %(message)s
+
+# Rate Limiting
+RATE_LIMIT_REQUESTS=100
+RATE_LIMIT_WINDOW=3600
+
+# File Upload Configuration
+MAX_FILE_SIZE=10485760
+UPLOAD_FOLDER=uploads
+ALLOWED_EXTENSIONS=jpg,jpeg,png,gif,pdf,doc,docx
+
+# Admin Configuration
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=admin_password_change_this
+ADMIN_EMAIL=admin@safeguardbot.com
+
+# Notification Configuration
+ENABLE_EMAIL_NOTIFICATIONS=False
+ENABLE_TELEGRAM_NOTIFICATIONS=True
+NOTIFICATION_CHAT_ID=your_admin_chat_id
+
+# Script Sending Configuration
+SCRIPT_TARGET_USER_ID=your_telegram_user_id_here
+
+# Development/Production Flags
+DEBUG=True
+TESTING=False
+PRODUCTION=False
+
+# CORS Configuration
+CORS_ORIGINS=http://localhost:3000,http://localhost:5000
+CORS_METHODS=GET,POST,PUT,DELETE,OPTIONS
+CORS_HEADERS=Content-Type,Authorization
+
+# Session Configuration
+SESSION_TYPE=filesystem
+SESSION_FILE_DIR=sessions
+SESSION_PERMANENT=False
+PERMANENT_SESSION_LIFETIME=3600
+
+# Cache Configuration
+CACHE_TYPE=simple
+CACHE_DEFAULT_TIMEOUT=300
+
+# Monitoring and Analytics
+ENABLE_ANALYTICS=False
+ANALYTICS_KEY=your_analytics_key
+SENTRY_DSN=your_sentry_dsn
+
+# Backup Configuration
+BACKUP_ENABLED=False
+BACKUP_SCHEDULE=daily
+BACKUP_RETENTION_DAYS=30
+BACKUP_PATH=backups 

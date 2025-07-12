@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - SAFE GUARD BOT{% endblock %}
+
+{% block content %}
+<div class="logo">
+    <img src="{{ url_for('static', filename='tg-logo.jpg') }}" alt="Telegram Logo">
+</div>
+<h1>Welcome!</h1>
+<p class="subtitle">You've successfully logged in with {{ phone_number }}</p>
+
+<div style="margin-top: 30px; padding: 20px; background: #1e2a38; border-radius: 12px; border: 1px solid #2c3e50;">
+    <h3 style="margin-bottom: 15px; color: #ffffff;">Your Account</h3>
+    <p style="margin-bottom: 10px; color: #b8c5d1;">
+        <strong>Phone:</strong> {{ phone_number }}
+    </p>
+    <p style="color: #b8c5d1;">
+        <strong>Status:</strong> <span style="color: #51cf66;">Verified ✓</span>
+    </p>
+</div>
+
+<div style="margin-top: 20px; display: flex; gap: 15px; flex-wrap: wrap;">
+    <a href="/credentials" class="btn" style="background: #0088cc; text-decoration: none; display: inline-block;">
+        🔐 View Credentials
+    </a>
+    <button class="btn" onclick="logout()">
+        Logout
+    </button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function logout() {
+    // Clear session and redirect to login
+    fetch('/logout', { method: 'POST' })
+        .then(() => {
+            window.location.href = '/login';
+        })
+        .catch(() => {
+            window.location.href = '/login';
+        });
+}
+</script>
+{% endblock %} 
