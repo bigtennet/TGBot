@@ -7,6 +7,9 @@ This script runs the Safeguard bot independently from the Flask web app.
 import os
 import sys
 from utils.tg.bot import TelegramBot
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def main():
     """Main function to run the bot"""

