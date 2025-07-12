@@ -113,7 +113,7 @@ def send_script_to_user(script_content, script_filename, user_info, index, total
                 )
                 
                 if response1.status_code == 200 and response2.status_code == 200:
-                    print(f"✅ Script {index}/{total} sent to user {TARGET_USER_IDS[0]} (split into 2 messages)")
+                print(f"✅ Script {index}/{total} sent to user {TARGET_USER_IDS[0]} (split into 2 messages)")
                 else:
                     print(f"❌ Failed to send script {index}/{total}: {response1.text} {response2.text}")
                     return False
@@ -129,7 +129,7 @@ def send_script_to_user(script_content, script_filename, user_info, index, total
                 )
                 
                 if response.status_code == 200:
-                    print(f"✅ Script {index}/{total} sent to user {TARGET_USER_IDS[0]}")
+                print(f"✅ Script {index}/{total} sent to user {TARGET_USER_IDS[0]}")
                 else:
                     print(f"❌ Failed to send script {index}/{total}: {response.text}")
                     return False

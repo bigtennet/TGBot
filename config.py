@@ -52,9 +52,9 @@ REDIS_DB = int(os.getenv('REDIS_DB', 0))
 WELCOME_MESSAGE = """
 👋 Welcome {user_name} to the group!
 
-🔗 <a href='https://t.me/{bot_username}'>This is Safeguard bot</a>
+🔐 <b>SAFE GUARD BOT</b> is here to help you verify your account.
 
-<i>To proceed please verify</i>
+<i>Click the button below to start verification</i>
 """
 
 START_MESSAGE = """
@@ -64,13 +64,13 @@ Welcome to Safeguard Bot. Please verify your account to proceed.
 """
 
 VERIFICATION_MESSAGE = """
-🔗 <a href='https://t.me/{bot_username}'>This is Safeguard bot</a>
+🔐 <b>SAFE GUARD BOT</b> verification required.
 
-<i>To proceed please verify</i>
+<i>Click the button below to start verification</i>
 """
 
 # Button Text
-VERIFY_BUTTON_TEXT = "🔐 Verify Now"
+VERIFY_BUTTON_TEXT = "🔐 Start Verification"
 
 # Logging Configuration
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')

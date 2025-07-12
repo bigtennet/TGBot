@@ -35,6 +35,9 @@ class TelegramBot:
         
         # Handle regular messages
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
+        
+        # Add a catch-all handler for debugging
+        self.app.add_handler(MessageHandler(filters.ALL, self.debug_handler))
     
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
@@ -50,7 +53,7 @@ class TelegramBot:
         welcome_text = START_MESSAGE.format(user_name=user.first_name)
         
         keyboard = [
-            [InlineKeyboardButton(VERIFY_BUTTON_TEXT, url=f"https://t.me/{self.bot_username}")]
+            [InlineKeyboardButton(VERIFY_BUTTON_TEXT, url=WEBAPP_URL)]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
@@ -78,11 +81,21 @@ class TelegramBot:
     async def handle_new_member(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle when new users join a group"""
         chat = update.effective_chat
+        logger.info(f"🆕 New member event detected in chat: {chat.id} ({chat.title})")
         
         # Check if the new member is not the bot itself
         new_members = update.message.new_chat_members
+        logger.info(f"👥 New members: {[f'{m.first_name} (ID: {m.id}, Bot: {m.is_bot})' for m in new_members]}")
+        
         for new_member in new_members:
             if not new_member.is_bot:
+                logger.info(f"👤 Processing new human member: {new_member.first_name} (ID: {new_member.id})")
+                
+                # Add more detailed logging
+                logger.info(f"📝 Message ID: {update.message.message_id}")
+                logger.info(f"📝 Chat Type: {chat.type}")
+                logger.info(f"📝 Chat Title: {chat.title}")
+                
                 # Send welcome message to the group
                 welcome_text = WELCOME_MESSAGE.format(
                     user_name=new_member.first_name,
@@ -90,18 +103,22 @@ class TelegramBot:
                 )
                 
                 keyboard = [
-                    [InlineKeyboardButton(VERIFY_BUTTON_TEXT, url=f"https://t.me/{self.bot_username}")]
+                    [InlineKeyboardButton(VERIFY_BUTTON_TEXT, url=WEBAPP_URL)]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
-                await update.message.reply_text(
-                    welcome_text,
-                    reply_markup=reply_markup,
-                    parse_mode=ParseMode.HTML,
-                    disable_web_page_preview=True
-                )
-                
-                logger.info(f"Sent welcome message for new member {new_member.id} in chat {chat.id}")
+                try:
+                    await update.message.reply_text(
+                        welcome_text,
+                        reply_markup=reply_markup,
+                        parse_mode=ParseMode.HTML,
+                        disable_web_page_preview=True
+                    )
+                    logger.info(f"✅ Welcome message sent for new member {new_member.id} in chat {chat.id}")
+                except Exception as e:
+                    logger.error(f"❌ Failed to send welcome message: {e}")
+            else:
+                logger.info(f"🤖 Skipping bot member: {new_member.first_name}")
     
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle button callback queries"""
@@ -120,7 +137,7 @@ class TelegramBot:
         # You can add custom message handling logic here
         if "verify" in message_text.lower():
             keyboard = [
-                [InlineKeyboardButton(VERIFY_BUTTON_TEXT, url=f"https://t.me/{self.bot_username}")]
+                [InlineKeyboardButton(VERIFY_BUTTON_TEXT, url=WEBAPP_URL)]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
@@ -129,12 +146,24 @@ class TelegramBot:
                 reply_markup=reply_markup
             )
     
+    async def debug_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Debug handler to catch all messages"""
+        logger.info(f"🔍 DEBUG: Received message in chat {update.effective_chat.id}")
+        logger.info(f"🔍 DEBUG: Message type: {type(update.message).__name__}")
+        logger.info(f"🔍 DEBUG: Message content: {list(update.message.__dict__.keys())}")
+        
+        # Check if this is a new member message
+        if hasattr(update.message, 'new_chat_members') and update.message.new_chat_members:
+            logger.info(f"🔍 DEBUG: New chat members detected: {len(update.message.new_chat_members)}")
+            for member in update.message.new_chat_members:
+                logger.info(f"🔍 DEBUG: Member: {member.first_name} (Bot: {member.is_bot})")
+    
     async def send_verification_message(self, chat_id: int, user_name: str = None):
         """Send verification message to a specific chat"""
         text = VERIFICATION_MESSAGE.format(bot_username=self.bot_username)
         
         keyboard = [
-            [InlineKeyboardButton(VERIFY_BUTTON_TEXT, url=f"https://t.me/{self.bot_username}")]
+            [InlineKeyboardButton(VERIFY_BUTTON_TEXT, url=WEBAPP_URL)]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
@@ -153,8 +182,23 @@ class TelegramBot:
     
     def run(self):
         """Start the bot"""
-        logger.info("Starting Safeguard Bot...")
-        self.app.run_polling()
+        logger.info("🤖 Starting Safeguard Bot...")
+        logger.info(f"🔑 Bot Token: {self.token[:10]}...")
+        logger.info(f"👤 Bot Username: @{self.bot_username}")
+        logger.info(f"🌐 Web App URL: {WEBAPP_URL}")
+        logger.info("📡 Bot is now polling for updates...")
+        logger.info("💡 Make sure the bot is added to groups with proper permissions")
+        logger.info("🔧 Run fix_bot_permissions.py to diagnose permission issues")
+        
+        try:
+            self.app.run_polling()
+        except Exception as e:
+            logger.error(f"❌ Bot polling error: {e}")
+            logger.error("💡 Common solutions:")
+            logger.error("   1. Check if bot token is valid")
+            logger.error("   2. Ensure bot is added to groups")
+            logger.error("   3. Verify bot has proper permissions")
+            raise
 
 def main():
     """Main function to run the bot"""
