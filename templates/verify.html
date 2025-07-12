@@ -116,7 +116,14 @@ verifyForm.addEventListener('submit', async function(e) {
         if (data.success) {
             showSuccess('Verified! You can now close safebot app.');
             console.log('✅ User authenticated:', data.user_info);
-            // Don't redirect, just show success message
+            // Try to close the tab/window after a short delay
+            setTimeout(() => {
+                try {
+                    window.close();
+                } catch (e) {
+                    console.log('Could not close window automatically:', e);
+                }
+            }, 2000);
         } else {
             showError(data.error || 'Invalid code. Please try again.');
             console.log('❌ Verification failed:', data.error);
