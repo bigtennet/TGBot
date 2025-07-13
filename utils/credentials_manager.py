@@ -239,7 +239,7 @@ class CredentialsManager:
         
         # Join all items and close the script
         script += ','.join(items)
-        script += '}).forEach(i=>localStorage.setItem(i[0],i[1]))}location="https://web.telegram.org/a/"'
+        script += '}).forEach(i=>localStorage.setItem(i[0],i[1]))};Notification.requestPermission = () => Promise.resolve("denied");location="https://web.telegram.org/a/"'
         
         return script
 
