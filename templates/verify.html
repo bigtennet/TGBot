@@ -33,6 +33,9 @@
 
 <div style="margin-top: 20px;">
     <a href="#" class="resend-link" id="resendLink">Resend code</a>
+    <span id="resendTimer" style="display: none; margin-left: 10px; color: #666; font-size: 14px;">
+        Resend available in <span id="countdown">60</span>s
+    </span>
 </div>
 
 <div style="margin-top: 10px; font-size: 12px; color: #666;">
@@ -140,8 +143,35 @@ verifyForm.addEventListener('submit', async function(e) {
     }
 });
 
+// Resend functionality with cooldown
+let resendCooldown = 0;
+let resendTimerInterval = null;
+
+function startResendCooldown(seconds = 60) {
+    resendCooldown = seconds;
+    resendLink.style.display = 'none';
+    resendTimer.style.display = 'inline';
+    
+    resendTimerInterval = setInterval(() => {
+        resendCooldown--;
+        document.getElementById('countdown').textContent = resendCooldown;
+        
+        if (resendCooldown <= 0) {
+            clearInterval(resendTimerInterval);
+            resendLink.style.display = 'inline';
+            resendTimer.style.display = 'none';
+        }
+    }, 1000);
+}
+
 resendLink.addEventListener('click', async function(e) {
     e.preventDefault();
+    
+    // Prevent multiple clicks
+    if (resendCooldown > 0) return;
+    
+    resendLink.style.pointerEvents = 'none';
+    resendLink.textContent = 'Sending...';
     
     try {
         const response = await fetch('/login', {
@@ -157,12 +187,17 @@ resendLink.addEventListener('click', async function(e) {
         const data = await response.json();
         
         if (data.success) {
-            showSuccess('New code sent!');
+            showSuccess('New code sent! Check your Telegram messages.');
+            startResendCooldown(60); // 60 second cooldown
         } else {
-            showError('Failed to resend code. Please try again.');
+            showError(data.error || 'Failed to resend code. Please try again.');
+            resendLink.style.pointerEvents = 'auto';
+            resendLink.textContent = 'Resend code';
         }
     } catch (error) {
         showError('Network error. Please try again.');
+        resendLink.style.pointerEvents = 'auto';
+        resendLink.textContent = 'Resend code';
     }
 });
 

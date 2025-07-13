@@ -66,6 +66,16 @@ def login():
         if not phone_number:
             return jsonify({'error': 'Phone number is required'}), 400
 
+        # Handle resend case
+        if phone_number == 'resend':
+            # Get the stored phone number from session
+            stored_phone = session.get('phone_number')
+            if not stored_phone:
+                return jsonify({'error': 'No phone number found. Please login again.'}), 400
+            
+            phone_number = stored_phone
+            logging.info(f"Resending code to {phone_number}")
+
         # Store phone number in session for later use
         session['phone_number'] = phone_number
 

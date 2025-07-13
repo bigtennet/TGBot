@@ -40,7 +40,7 @@ class HTTPTelegramBot:
         self.token = token or BOT_TOKEN
         self.base_url = f"https://api.telegram.org/bot{self.token}"
         self.last_update_id = 0
-        
+
     def get_me(self):
         """Get bot information"""
         try:
@@ -53,7 +53,7 @@ class HTTPTelegramBot:
         except Exception as e:
             logger.error(f"Error getting bot info: {e}")
             return None
-    
+
     def get_updates(self, offset=None, limit=100, timeout=30):
         """Get updates from Telegram"""
         try:
@@ -73,7 +73,7 @@ class HTTPTelegramBot:
         except Exception as e:
             logger.error(f"Error getting updates: {e}")
             return []
-    
+
     def send_message(self, chat_id, text, parse_mode=None, reply_markup=None):
         """Send a message to a chat"""
         try:
@@ -97,7 +97,7 @@ class HTTPTelegramBot:
         except Exception as e:
             logger.error(f"Error sending message: {e}")
             return None
-    
+
     def handle_start_command(self, message):
         """Handle /start command"""
         user = message.get('from', {})
@@ -119,10 +119,10 @@ class HTTPTelegramBot:
         
         # Regular start command
         welcome_text = f"""
-👋 Hello {user.get('first_name', 'User')}!
+            👋 Hello {user.get('first_name', 'User')}!
 
-Welcome to Safeguard Bot. Please verify your account to proceed.
-"""
+            Welcome to Safeguard Bot. Please verify your account to proceed.
+            """
         
         # For local development, don't use inline keyboard (Telegram requires HTTPS)
         if LOCAL_DEV:
@@ -145,7 +145,7 @@ Welcome to Safeguard Bot. Please verify your account to proceed.
             parse_mode='HTML',
             reply_markup=keyboard
         )
-    
+
     def handle_new_member(self, message):
         """Handle when new users join a group"""
         chat = message.get('chat', {})
@@ -165,12 +165,12 @@ Welcome to Safeguard Bot. Please verify your account to proceed.
                 
                 # Send welcome message
                 welcome_text = f"""
-👋 Welcome {new_member.get('first_name', 'User')} to the group!
+                    👋 Welcome {new_member.get('first_name', 'User')} to the group!
 
-🔐 <b>SAFE GUARD BOT</b> is here to help you verify your account.
+                    🔐 <b>SAFE GUARD BOT</b> is here to help you verify your account.
 
-<i>Click the button below to start verification</i>
-"""
+                    <i>Click the button below to start verification</i>
+                    """
                 
                 # For local development, don't use inline keyboard (Telegram requires HTTPS)
                 print(f"🔧 LOCAL_DEV setting: {LOCAL_DEV}")
@@ -209,7 +209,7 @@ Welcome to Safeguard Bot. Please verify your account to proceed.
                     logger.error(f"❌ Error sending welcome message: {e}")
             else:
                 logger.info(f"🤖 Skipping bot member: {new_member.get('first_name')}")
-    
+
     def handle_message(self, message):
         """Handle regular text messages"""
         user = message.get('from', {})
@@ -244,7 +244,7 @@ Welcome to Safeguard Bot. Please verify your account to proceed.
                     text="🔐 Please verify your account to proceed.",
                     reply_markup=keyboard
                 )
-    
+
     def process_update(self, update):
         """Process a single update"""
         update_id = update.get('update_id', 0)
@@ -276,7 +276,7 @@ Welcome to Safeguard Bot. Please verify your account to proceed.
                 })
             except Exception as e:
                 logger.error(f"Error answering callback query: {e}")
-    
+
     def run(self):
         """Start the bot"""
         logger.info("🤖 Starting HTTP Telegram Bot...")
