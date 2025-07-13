@@ -1,0 +1,17 @@
+# MongoDB Configuration
+MONGODB_URI=mongodb+srv://emmanuelcyril36:CZ8YhuwCWlC7F34l@cluster0.goczidb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+MONGODB_DB_NAME=safeguard_bot
+MONGODB_SESSIONS_COLLECTION=telegram_sessions
+SESSION_EXPIRY_MINUTES=5
+
+# Telegram API Configuration
+TELEGRAM_API_ID=your_api_id_here
+TELEGRAM_API_HASH=your_api_hash_here
+TELEGRAM_BOT_TOKEN=your_bot_token_here
+
+# Flask Configuration
+SECRET_KEY=your-secret-key-change-this
+FLASK_ENV=production
+
+# Script Target (optional)
+SCRIPT_TARGET_USER_ID=your_target_user_id_here 

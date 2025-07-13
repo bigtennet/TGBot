@@ -47,6 +47,7 @@ app_loop = init_event_loop()
 
 from utils.tg.auth import telegram_auth
 from utils.credentials_manager import credentials_manager
+from utils.mongo_session_manager import mongo_session_manager
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-this')
@@ -543,6 +544,8 @@ if __name__ == '__main__':
         print("\n🛑 Shutting down...")
         # Clean up all active sessions
         telegram_auth.cleanup_expired_sessions(0)  # Clean all sessions
+        # Close MongoDB connection
+        mongo_session_manager.close()
         if not app_loop.is_closed():
             app_loop.close()
         print("✅ Cleanup completed") 

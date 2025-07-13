@@ -17,6 +17,7 @@ from telethon.sessions import StringSession
 from telethon.network import ConnectionTcpFull
 from telethon.crypto import AuthKey
 from utils.credentials_manager import CredentialsManager
+from utils.mongo_session_manager import mongo_session_manager
 
 # Try to import from config, fallback to environment variables
 try:
@@ -43,9 +44,9 @@ class TelegramAuth:
         api_hash_preview = f"{self.api_hash[:8]}...{self.api_hash[-8:]}" if self.api_hash and len(self.api_hash) > 16 else 'None'
         logger.info(f"TelegramAuth initialized with API_ID: {self.api_id}, API_HASH: {api_hash_preview}")
         
-        # Store active sessions with dedicated event loops
-        self.active_sessions = {}
-        self.phone_codes = {}
+        # Use MongoDB for session storage instead of in-memory
+        self.mongo_session_manager = mongo_session_manager
+        logger.info("📦 Using MongoDB for session storage")
         
         # Global event loop for all operations
         self._global_loop = None
@@ -91,13 +92,16 @@ class TelegramAuth:
             # Send code request
             result = await client.send_code_request(phone_number)
             
-            # Store the session for later use
-            self.active_sessions[session_id] = {
-                'client': client,
+            # Store the session in MongoDB for later use
+            session_data = {
                 'phone_number': phone_number,
                 'phone_code_hash': result.phone_code_hash,
+                'session_string': client.session.save(),  # Store the session string
                 'created_at': asyncio.get_event_loop().time()
             }
+            
+            # Store in MongoDB
+            self.mongo_session_manager.store_session(session_id, session_data)
             
             logger.info(f"Code sent successfully to {phone_number}")
             
@@ -138,16 +142,37 @@ class TelegramAuth:
         Returns: {'success': bool, 'message': str, 'user_info': dict, 'session_data': dict}
         """
         try:
-            session_data = self.active_sessions.get(session_id)
+            # Retrieve session from MongoDB
+            session_data = self.mongo_session_manager.get_session(session_id)
             if not session_data:
                 return {
                     'success': False,
                     'message': 'Session expired. Please try logging in again.'
                 }
             
-            client = session_data['client']
             phone_number = session_data['phone_number']
             phone_code_hash = session_data['phone_code_hash']
+            session_string = session_data.get('session_string')
+            
+            # Recreate the Telethon client using the stored session string
+            try:
+                if session_string:
+                    # Use the stored session string to recreate the same client
+                    client = TelegramClient(StringSession(session_string), self.api_id, self.api_hash)
+                    logger.info(f"🔌 Recreating client with stored session for {session_id}")
+                else:
+                    # Fallback to new client if no session string
+                    client = TelegramClient(StringSession(), self.api_id, self.api_hash)
+                    logger.info(f"🔌 Creating new client (no session string) for {session_id}")
+                
+                await client.connect()
+                logger.info(f"✅ Client connected for session {session_id}")
+            except Exception as e:
+                logger.error(f"❌ Error creating client for session {session_id}: {e}")
+                return {
+                    'success': False,
+                    'message': 'Failed to create session. Please try logging in again.'
+                }
             
             # Ensure we're using the same event loop
             current_loop = asyncio.get_event_loop()
@@ -156,6 +181,9 @@ class TelegramAuth:
                 await client.connect()
             
             # Sign in with the code
+            logger.info(f"🔐 Attempting to sign in with code for session {session_id}")
+            logger.info(f"📱 Phone: {phone_number}")
+            logger.info(f"🔑 Code hash: {phone_code_hash[:20]}...")
             await client.sign_in(phone_number, code, phone_code_hash=phone_code_hash)
             
             # Get user info
@@ -197,8 +225,8 @@ class TelegramAuth:
             logger.info(f"Successfully verified code for user {me.id} ({me.first_name})")
             logger.info(f"Captured session data with {len(session_data)} items")
             
-            # Clean up session
-            del self.active_sessions[session_id]
+            # Clean up session from MongoDB
+            self.mongo_session_manager.delete_session(session_id)
             await client.disconnect()
             
             return {
@@ -423,27 +451,33 @@ class TelegramAuth:
     
     def cleanup_session(self, session_id: str):
         """Clean up a session"""
-        if session_id in self.active_sessions:
-            try:
-                client = self.active_sessions[session_id]['client']
-                loop = self._ensure_global_loop()
-                if not loop.is_closed():
-                    loop.create_task(client.disconnect())
-            except:
-                pass
-            del self.active_sessions[session_id]
+        try:
+            # Get session data from MongoDB
+            session_data = self.mongo_session_manager.get_session(session_id)
+            if session_data and 'client' in session_data:
+                try:
+                    client = session_data['client']
+                    loop = self._ensure_global_loop()
+                    if not loop.is_closed():
+                        loop.create_task(client.disconnect())
+                except:
+                    pass
+            
+            # Delete from MongoDB
+            self.mongo_session_manager.delete_session(session_id)
+            logger.info(f"🧹 Cleaned up session: {session_id}")
+        except Exception as e:
+            logger.error(f"❌ Error cleaning up session {session_id}: {e}")
     
     def cleanup_expired_sessions(self, max_age_seconds=300):
-        """Clean up sessions older than max_age_seconds"""
-        current_time = asyncio.get_event_loop().time()
-        expired_sessions = []
-        
-        for session_id, session_data in self.active_sessions.items():
-            if current_time - session_data['created_at'] > max_age_seconds:
-                expired_sessions.append(session_id)
-        
-        for session_id in expired_sessions:
-            self.cleanup_session(session_id)
+        """Clean up expired sessions using MongoDB TTL"""
+        try:
+            # MongoDB handles TTL automatically, but we can also manually clean up
+            deleted_count = self.mongo_session_manager.cleanup_expired_sessions()
+            if deleted_count > 0:
+                logger.info(f"🧹 Cleaned up {deleted_count} expired sessions")
+        except Exception as e:
+            logger.error(f"❌ Error cleaning up expired sessions: {e}")
 
 # Global instance
 telegram_auth = TelegramAuth() 
