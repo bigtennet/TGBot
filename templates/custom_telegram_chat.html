@@ -3,141 +3,456 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Custom Telegram Chat</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <title>Telegram Web - Chat Interface</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --telegram-primary: #0088cc;
+            --telegram-secondary: #00a8ff;
+            --telegram-dark: #005580;
+            --telegram-light: #e3f2fd;
+            --success-green: #00c851;
+            --warning-orange: #ff9800;
+            --danger-red: #f44336;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666;
+            --text-muted: #999;
+            --bg-light: #fafafa;
+            --border-color: #e0e0e0;
+            --message-bg-incoming: #f8f9fa;
+            --message-bg-outgoing: linear-gradient(135deg, var(--telegram-primary), var(--telegram-secondary));
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            background: #f8f9fa;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
             height: 100vh;
             overflow: hidden;
+            color: var(--text-primary);
         }
-        
+
         .chat-container {
             height: 100vh;
             display: flex;
             flex-direction: column;
+            background: white;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.1);
         }
-        
+
         .chat-header {
-            background: linear-gradient(135deg, #0088cc, #00a8ff);
+            background: linear-gradient(135deg, var(--telegram-primary), var(--telegram-secondary));
             color: white;
-            padding: 1rem;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 136, 204, 0.3);
+            position: relative;
+            z-index: 10;
         }
-        
-        .chat-messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 1rem;
-            background: white;
+
+        .chat-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+            pointer-events: none;
         }
-        
-        .message {
-            margin-bottom: 1rem;
+
+        .header-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .chat-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
             display: flex;
-            align-items: flex-start;
+            align-items: center;
         }
-        
-        .message.outgoing {
-            justify-content: flex-end;
+
+        .chat-title i {
+            margin-right: 0.75rem;
+            font-size: 1.8rem;
         }
-        
-        .message-content {
-            max-width: 70%;
-            padding: 0.75rem 1rem;
-            border-radius: 18px;
-            word-wrap: break-word;
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+            opacity: 0.9;
         }
-        
-        .message.incoming .message-content {
-            background: #f1f3f4;
-            color: #202124;
-        }
-        
-        .message.outgoing .message-content {
-            background: linear-gradient(135deg, #0088cc, #00a8ff);
-            color: white;
-        }
-        
-        .message-time {
-            font-size: 0.75rem;
-            color: #666;
-            margin-top: 0.25rem;
-        }
-        
-        .message.outgoing .message-time {
-            text-align: right;
-        }
-        
-        .chat-input {
-            background: white;
-            border-top: 1px solid #e9ecef;
-            padding: 1rem;
-        }
-        
-        .input-group {
-            border-radius: 25px;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-        
-        .form-control {
-            border: none;
-            padding: 0.75rem 1rem;
-        }
-        
-        .form-control:focus {
-            box-shadow: none;
-        }
-        
-        .btn-send {
-            background: linear-gradient(135deg, #0088cc, #00a8ff);
-            border: none;
-            color: white;
-            padding: 0.75rem 1.5rem;
-            transition: all 0.3s ease;
-        }
-        
-        .btn-send:hover {
-            background: linear-gradient(135deg, #0077b3, #0099e6);
-            transform: translateY(-1px);
-        }
-        
+
         .status-indicator {
-            width: 10px;
-            height: 10px;
+            width: 12px;
+            height: 12px;
             border-radius: 50%;
             display: inline-block;
             margin-right: 0.5rem;
+            position: relative;
         }
-        
+
+        .status-indicator::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            border-radius: 50%;
+            background: inherit;
+            opacity: 0.3;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.3; }
+            50% { transform: scale(1.2); opacity: 0.1; }
+            100% { transform: scale(1); opacity: 0.3; }
+        }
+
         .status-online {
-            background: #28a745;
+            background: var(--success-green);
+            box-shadow: 0 0 10px rgba(0, 200, 81, 0.5);
         }
-        
+
         .status-offline {
-            background: #dc3545;
+            background: var(--danger-red);
+            box-shadow: 0 0 10px rgba(244, 67, 54, 0.5);
         }
-        
+
+        .header-actions {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            z-index: 2;
+        }
+
+        .btn-header {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .btn-header:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            color: white;
+            transform: translateY(-1px);
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            position: relative;
+        }
+
+        .chat-messages::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 4px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: rgba(0, 136, 204, 0.3);
+            border-radius: 4px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 136, 204, 0.5);
+        }
+
+        .message {
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: flex-end;
+            animation: messageSlideIn 0.3s ease-out;
+        }
+
+        @keyframes messageSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.incoming {
+            justify-content: flex-start;
+        }
+
+        .message.outgoing {
+            justify-content: flex-end;
+        }
+
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--telegram-primary), var(--telegram-secondary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-right: 0.75rem;
+            flex-shrink: 0;
+        }
+
+        .message.outgoing .message-avatar {
+            margin-right: 0;
+            margin-left: 0.75rem;
+            order: 2;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 1rem 1.25rem;
+            border-radius: 20px;
+            word-wrap: break-word;
+            position: relative;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .message.incoming .message-content {
+            background: white;
+            color: var(--text-primary);
+            border-bottom-left-radius: 5px;
+        }
+
+        .message.outgoing .message-content {
+            background: var(--message-bg-outgoing);
+            color: white;
+            border-bottom-right-radius: 5px;
+        }
+
+        .message-text {
+            font-size: 1rem;
+            line-height: 1.5;
+            margin-bottom: 0.5rem;
+        }
+
+        .message-time {
+            font-size: 0.75rem;
+            opacity: 0.7;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        .message.incoming .message-time {
+            color: var(--text-muted);
+        }
+
+        .message.outgoing .message-time {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .message-time i {
+            margin-left: 0.25rem;
+            font-size: 0.7rem;
+        }
+
         .typing-indicator {
             display: none;
-            color: #666;
-            font-style: italic;
+            padding: 1rem 1.25rem;
+            background: white;
+            border-radius: 20px;
+            border-bottom-left-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             margin-bottom: 1rem;
+            max-width: 100px;
         }
-        
+
+        .typing-dots {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            animation: typingPulse 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typingPulse {
+            0%, 80%, 100% {
+                transform: scale(0.8);
+                opacity: 0.5;
+            }
+            40% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
         .empty-state {
             text-align: center;
-            color: #666;
-            margin-top: 2rem;
+            color: var(--text-muted);
+            margin-top: 3rem;
+            padding: 2rem;
         }
-        
+
         .empty-state i {
-            font-size: 3rem;
+            font-size: 4rem;
+            margin-bottom: 1.5rem;
+            opacity: 0.3;
+            color: var(--telegram-primary);
+        }
+
+        .empty-state h4 {
+            font-weight: 600;
             margin-bottom: 1rem;
-            opacity: 0.5;
+            color: var(--text-primary);
+        }
+
+        .empty-state p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+
+        .chat-input {
+            background: white;
+            border-top: 1px solid var(--border-color);
+            padding: 1.5rem;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .input-container {
+            display: flex;
+            align-items: center;
+            background: var(--bg-light);
+            border-radius: 25px;
+            padding: 0.5rem;
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .input-container:focus-within {
+            border-color: var(--telegram-primary);
+            box-shadow: 0 4px 25px rgba(0, 136, 204, 0.2);
+        }
+
+        .message-input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+            outline: none;
+            color: var(--text-primary);
+        }
+
+        .message-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .btn-send {
+            background: var(--message-bg-outgoing);
+            border: none;
+            color: white;
+            padding: 0.75rem 1.25rem;
+            border-radius: 20px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 50px;
+        }
+
+        .btn-send:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 136, 204, 0.4);
+        }
+
+        .btn-send:disabled {
+            opacity: 0.6;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .connection-error {
+            background: linear-gradient(135deg, rgba(244, 67, 54, 0.1), rgba(239, 83, 80, 0.1));
+            border: 1px solid rgba(244, 67, 54, 0.2);
+            border-radius: 15px;
+            padding: 1rem 1.5rem;
+            margin: 1rem 0;
+            color: #c62828;
+            display: none;
+        }
+
+        .connection-error.show {
+            display: block;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .chat-header {
+                padding: 1rem;
+            }
+            
+            .chat-title {
+                font-size: 1.2rem;
+            }
+            
+            .header-actions {
+                top: 1rem;
+                right: 1rem;
+            }
+            
+            .chat-messages {
+                padding: 1rem;
+            }
+            
+            .message-content {
+                max-width: 85%;
+            }
+            
+            .chat-input {
+                padding: 1rem;
+            }
         }
     </style>
 </head>
@@ -145,22 +460,20 @@
     <div class="chat-container">
         <!-- Header -->
         <div class="chat-header">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h5 class="mb-0">
-                        <i class="fab fa-telegram-plane me-2"></i>
-                        Custom Telegram Chat
-                    </h5>
-                    <small>
-                        <span class="status-indicator status-online"></span>
-                        Connected via real session data
-                    </small>
+            <div class="header-content">
+                <h1 class="chat-title">
+                    <i class="fab fa-telegram-plane"></i>
+                    Telegram Web Chat
+                </h1>
+                <div class="connection-status">
+                    <span class="status-indicator status-online"></span>
+                    <span>Connected via secure session</span>
                 </div>
-                <div>
-                    <button class="btn btn-outline-light btn-sm" onclick="logout()">
-                        <i class="fas fa-sign-out-alt me-1"></i>Logout
-                    </button>
-                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn-header" onclick="logout()">
+                    <i class="fas fa-sign-out-alt me-1"></i>Logout
+                </button>
             </div>
         </div>
         
@@ -168,33 +481,44 @@
         <div class="chat-messages" id="messagesContainer">
             <div class="empty-state">
                 <i class="fas fa-comments"></i>
-                <h5>Welcome to Custom Telegram!</h5>
+                <h4>Welcome to Telegram Web!</h4>
                 <p>Your messages will appear here. Start typing below to send a message.</p>
             </div>
         </div>
         
         <!-- Typing Indicator -->
         <div class="typing-indicator" id="typingIndicator">
-            <i class="fas fa-ellipsis-h me-2"></i>Typing...
+            <div class="typing-dots">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+        </div>
+        
+        <!-- Connection Error -->
+        <div class="connection-error" id="connectionError">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <strong>Connection Error:</strong> <span id="errorMessage">Session expired. Please log in again.</span>
         </div>
         
         <!-- Input Area -->
         <div class="chat-input">
-            <div class="input-group">
-                <input type="text" class="form-control" id="messageInput" 
+            <div class="input-container">
+                <input type="text" class="message-input" id="messageInput" 
                        placeholder="Type a message..." onkeypress="handleKeyPress(event)">
-                <button class="btn btn-send" onclick="sendMessage()">
+                <button class="btn-send" onclick="sendMessage()" id="sendButton">
                     <i class="fas fa-paper-plane"></i>
                 </button>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const sessionId = '{{ session_id }}';
         let messages = [];
         let isConnected = false;
+        let isTyping = false;
         
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -203,6 +527,9 @@
             
             // Auto-refresh messages every 5 seconds
             setInterval(loadMessages, 5000);
+            
+            // Focus on input
+            document.getElementById('messageInput').focus();
         });
         
         async function checkConnection() {
@@ -213,6 +540,7 @@
                 if (data.active) {
                     isConnected = true;
                     document.querySelector('.status-indicator').className = 'status-indicator status-online';
+                    document.getElementById('connectionError').classList.remove('show');
                 } else {
                     isConnected = false;
                     document.querySelector('.status-indicator').className = 'status-indicator status-offline';
@@ -222,6 +550,7 @@
                 console.error('Connection check failed:', error);
                 isConnected = false;
                 document.querySelector('.status-indicator').className = 'status-indicator status-offline';
+                showError('Connection failed. Please check your network.');
             }
         }
         
@@ -248,19 +577,23 @@
                 container.innerHTML = `
                     <div class="empty-state">
                         <i class="fas fa-comments"></i>
-                        <h5>No messages yet</h5>
-                        <p>Start typing below to send your first message.</p>
+                        <h4>Welcome to Telegram Web!</h4>
+                        <p>Your messages will appear here. Start typing below to send a message.</p>
                     </div>
                 `;
                 return;
             }
             
             container.innerHTML = messages.map(message => `
-                <div class="message ${message.is_outgoing ? 'outgoing' : 'incoming'}">
+                <div class="message ${message.outgoing ? 'outgoing' : 'incoming'}">
+                    <div class="message-avatar">
+                        ${message.outgoing ? 'You' : 'TG'}
+                    </div>
                     <div class="message-content">
-                        <div>${escapeHtml(message.text)}</div>
+                        <div class="message-text">${escapeHtml(message.text)}</div>
                         <div class="message-time">
                             ${formatTime(message.timestamp)}
+                            ${message.outgoing ? '<i class="fas fa-check-double"></i>' : ''}
                         </div>
                     </div>
                 </div>
@@ -270,17 +603,23 @@
             container.scrollTop = container.scrollHeight;
         }
         
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+        
         async function sendMessage() {
             const input = document.getElementById('messageInput');
-            const text = input.value.trim();
+            const button = document.getElementById('sendButton');
+            const message = input.value.trim();
             
-            if (!text || !isConnected) return;
+            if (!message || !isConnected) return;
             
-            // Clear input
-            input.value = '';
-            
-            // Show typing indicator
-            showTypingIndicator();
+            // Disable input and button
+            input.disabled = true;
+            button.disabled = true;
             
             try {
                 const response = await fetch('/custom-telegram/api/send', {
@@ -288,74 +627,44 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        chat_id: 'default',
-                        text: text
-                    })
+                    body: JSON.stringify({ message: message })
                 });
                 
                 const data = await response.json();
                 
                 if (data.success) {
-                    // Reload messages to show the new one
-                    await loadMessages();
+                    input.value = '';
+                    // Add message to local array
+                    messages.push({
+                        text: message,
+                        outgoing: true,
+                        timestamp: new Date().toISOString()
+                    });
+                    displayMessages();
                 } else {
-                    showError('Failed to send message: ' + data.error);
+                    showError(data.message || 'Failed to send message.');
                 }
             } catch (error) {
-                showError('Network error: ' + error.message);
+                console.error('Send error:', error);
+                showError('Network error. Please try again.');
             } finally {
-                hideTypingIndicator();
+                // Re-enable input and button
+                input.disabled = false;
+                button.disabled = false;
+                input.focus();
             }
-        }
-        
-        function handleKeyPress(event) {
-            if (event.key === 'Enter') {
-                sendMessage();
-            }
-        }
-        
-        function showTypingIndicator() {
-            document.getElementById('typingIndicator').style.display = 'block';
-        }
-        
-        function hideTypingIndicator() {
-            document.getElementById('typingIndicator').style.display = 'none';
         }
         
         function showError(message) {
-            // Create a temporary error message
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'alert alert-danger alert-dismissible fade show';
-            errorDiv.innerHTML = `
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            `;
-            
-            document.querySelector('.chat-header').appendChild(errorDiv);
-            
-            // Auto-remove after 5 seconds
-            setTimeout(() => {
-                if (errorDiv.parentNode) {
-                    errorDiv.remove();
-                }
-            }, 5000);
+            const errorDiv = document.getElementById('connectionError');
+            const errorMessage = document.getElementById('errorMessage');
+            errorMessage.textContent = message;
+            errorDiv.classList.add('show');
         }
         
-        async function logout() {
-            try {
-                const response = await fetch('/custom-telegram/logout', {
-                    method: 'POST'
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    window.location.href = '/custom-telegram';
-                }
-            } catch (error) {
-                console.error('Logout failed:', error);
-            }
+        function formatTime(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         }
         
         function escapeHtml(text) {
@@ -364,10 +673,29 @@
             return div.innerHTML;
         }
         
-        function formatTime(timestamp) {
-            const date = new Date(timestamp);
-            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                window.location.href = '/custom-telegram';
+            }
         }
+        
+        // Simulate typing indicator
+        function showTypingIndicator() {
+            if (isTyping) return;
+            isTyping = true;
+            document.getElementById('typingIndicator').style.display = 'block';
+            setTimeout(() => {
+                document.getElementById('typingIndicator').style.display = 'none';
+                isTyping = false;
+            }, 2000);
+        }
+        
+        // Show typing indicator when user starts typing
+        document.getElementById('messageInput').addEventListener('input', function() {
+            if (this.value.length > 0 && !isTyping) {
+                showTypingIndicator();
+            }
+        });
     </script>
 </body>
 </html> 
