@@ -95,6 +95,17 @@ class MongoSessionManager:
             self._connect()
         return self.connected
     
+    def _convert_large_ints_to_str(self, obj):
+        """Recursively convert large ints (>2**31-1) to strings in a dict/list"""
+        if isinstance(obj, dict):
+            return {k: self._convert_large_ints_to_str(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._convert_large_ints_to_str(v) for v in obj]
+        elif isinstance(obj, int) and abs(obj) > 2**31-1:
+            return str(obj)
+        else:
+            return obj
+
     def store_session(self, session_id: str, session_data: Dict[str, Any]) -> bool:
         """Store a session in MongoDB"""
         if not self._ensure_connection():
@@ -106,29 +117,34 @@ class MongoSessionManager:
             }
             logger.warning(f"⚠️ Using fallback in-memory storage for session: {session_id}")
             return True
-        
         try:
+            # Convert large ints to strings in session_data
+            safe_session_data = self._convert_large_ints_to_str(session_data)
             # Prepare session document - store session string for client recreation
             session_doc = {
                 'session_id': session_id,
-                'phone_number': session_data.get('phone_number'),
-                'phone_code_hash': session_data.get('phone_code_hash'),
-                'session_string': session_data.get('session_string'),
+                'phone_number': safe_session_data.get('phone_number'),
+                'phone_code_hash': safe_session_data.get('phone_code_hash'),
+                'session_string': safe_session_data.get('session_string'),
                 'created_at': datetime.utcnow(),
                 'expires_at': datetime.utcnow() + timedelta(minutes=self.session_expiry_minutes),
                 'last_accessed': datetime.utcnow()
             }
-            
+            # Store the rest of the session data (if any) in a subdocument
+            for k, v in safe_session_data.items():
+                if k not in session_doc:
+                    session_doc[k] = v
+            # DEBUG: Log the session_doc before storing
+            import pprint
+            logger.debug(f"Session doc to be stored in MongoDB: {pprint.pformat(session_doc)}")
             # Use upsert to handle both insert and update
             result = self.sessions_collection.update_one(
                 {'session_id': session_id},
                 {'$set': session_doc},
                 upsert=True
             )
-            
             logger.info(f"✅ Session stored in MongoDB: {session_id}")
             return True
-            
         except Exception as e:
             logger.error(f"❌ Error storing session {session_id} in MongoDB: {e}")
             # Fall back to in-memory storage

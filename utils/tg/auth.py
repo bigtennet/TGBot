@@ -1,69 +1,55 @@
 import os
-import logging
-import asyncio
-import sys
-import threading
-import uuid
 import json
-import base64
-import secrets
+import uuid
 import time
+import asyncio
+import logging
+import secrets
+import base64
 from datetime import datetime
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-
 from telethon import TelegramClient
-from telethon.errors import PhoneNumberInvalidError, PhoneCodeInvalidError, SessionPasswordNeededError
 from telethon.sessions import StringSession
-from telethon.network import ConnectionTcpFull
-from telethon.crypto import AuthKey
-from utils.credentials_manager import CredentialsManager
-from utils.mongo_session_manager import mongo_session_manager
+from telethon.errors import PhoneNumberInvalidError, PhoneCodeInvalidError, SessionPasswordNeededError
 
-# Try to import from config, fallback to environment variables
-try:
-    from config import TELEGRAM_API_ID, TELEGRAM_API_HASH, BOT_TOKEN
-    api_id = TELEGRAM_API_ID
-    api_hash = TELEGRAM_API_HASH
-    bot_token = BOT_TOKEN
-except ImportError:
-    # Fallback to environment variables
-    api_id = os.environ.get('TELEGRAM_API_ID')
-    api_hash = os.environ.get('TELEGRAM_API_HASH')
-    bot_token = os.environ.get('BOT_TOKEN')
+from utils.credentials_manager import CredentialsManager
+from utils.mongodb_manager import mongodb_manager
 
 logger = logging.getLogger(__name__)
 
 class TelegramAuth:
     def __init__(self):
         # Get API credentials from config or environment
-        self.api_id = api_id
-        self.api_hash = api_hash
-        self.bot_token = bot_token
+        self.api_id = os.getenv('TELEGRAM_API_ID', '29341250')
+        self.api_hash = os.getenv('TELEGRAM_API_HASH', '2b4cd7da8f2544a5')
         
-        # Debug logging
-        api_hash_preview = f"{self.api_hash[:8]}...{self.api_hash[-8:]}" if self.api_hash and len(self.api_hash) > 16 else 'None'
-        logger.info(f"TelegramAuth initialized with API_ID: {self.api_id}, API_HASH: {api_hash_preview}")
+        # Convert to int if string
+        if isinstance(self.api_id, str):
+            self.api_id = int(self.api_id)
         
-        # Use MongoDB for session storage instead of in-memory
-        self.mongo_session_manager = mongo_session_manager
-        logger.info("📦 Using MongoDB for session storage")
+        logger.info(f"TelegramAuth initialized with API_ID: {self.api_id}, API_HASH: {self.api_hash[:8]}...{self.api_hash[-8:]}")
         
-        # Global event loop for all operations
-        self._global_loop = None
-        self._loop_lock = threading.Lock()
+        # Check MongoDB connection
+        if mongodb_manager.is_connected():
+            logger.info("📊 Using MongoDB for session storage")
+        else:
+            logger.warning("⚠️ MongoDB not available, falling back to file-based storage")
+            self.sessions_dir = "sessions"
+            os.makedirs(self.sessions_dir, exist_ok=True)
+        
+        # Global event loop for async operations
+        self._loop = None
     
     def _ensure_global_loop(self):
         """Ensure we have a global event loop for all operations"""
-        with self._loop_lock:
-            if self._global_loop is None or self._global_loop.is_closed():
-                try:
-                    # Try to get the current event loop
-                    self._global_loop = asyncio.get_event_loop()
-                except RuntimeError:
-                    # Create a new event loop if none exists
-                    self._global_loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(self._global_loop)
-        return self._global_loop
+        if self._loop is None or self._loop.is_closed():
+            try:
+                # Try to get the current event loop
+                self._loop = asyncio.get_event_loop()
+            except RuntimeError:
+                # Create a new event loop if none exists
+                self._loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(self._loop)
+        return self._loop
 
     def send_code_sync(self, phone_number: str) -> dict:
         """
@@ -80,8 +66,10 @@ class TelegramAuth:
         """
         client = None
         try:
-            # Create a unique session ID
-            session_id = f"session_{phone_number}_{uuid.uuid4().hex[:8]}"
+            # Create a unique session ID with shorter format to avoid MongoDB integer overflow
+            import hashlib
+            phone_hash = hashlib.md5(phone_number.encode()).hexdigest()[:8]
+            session_id = f"session_{phone_hash}_{uuid.uuid4().hex[:8]}"
             
             # Create a new client session
             client = TelegramClient(StringSession(), self.api_id, self.api_hash)
@@ -92,16 +80,19 @@ class TelegramAuth:
             # Send code request
             result = await client.send_code_request(phone_number)
             
-            # Store the session in MongoDB for later use
+            # Store the session in file for later use
             session_data = {
                 'phone_number': phone_number,
                 'phone_code_hash': result.phone_code_hash,
                 'session_string': client.session.save(),  # Store the session string
-                'created_at': asyncio.get_event_loop().time()
+                'created_at': time.time()
             }
             
-            # Store in MongoDB
-            self.mongo_session_manager.store_session(session_id, session_data)
+            # Store session data
+            if mongodb_manager.is_connected():
+                mongodb_manager.save_session(session_id, session_data)
+            else:
+                self._store_session_file(session_id, session_data)
             
             logger.info(f"Code sent successfully to {phone_number}")
             
@@ -142,8 +133,12 @@ class TelegramAuth:
         Returns: {'success': bool, 'message': str, 'user_info': dict, 'session_data': dict}
         """
         try:
-            # Retrieve session from MongoDB
-            session_data = self.mongo_session_manager.get_session(session_id)
+            # Retrieve session data
+            if mongodb_manager.is_connected():
+                session_data = mongodb_manager.get_session(session_id)
+            else:
+                session_data = self._get_session_file(session_id)
+            
             if not session_data:
                 return {
                     'success': False,
@@ -225,8 +220,11 @@ class TelegramAuth:
             logger.info(f"Successfully verified code for user {me.id} ({me.first_name})")
             logger.info(f"Captured session data with {len(session_data)} items")
             
-            # Clean up session from MongoDB
-            self.mongo_session_manager.delete_session(session_id)
+            # Clean up session data
+            if mongodb_manager.is_connected():
+                mongodb_manager.delete_session(session_id)
+            else:
+                self._delete_session_file(session_id)
             await client.disconnect()
             
             return {
@@ -452,32 +450,115 @@ class TelegramAuth:
     def cleanup_session(self, session_id: str):
         """Clean up a session"""
         try:
-            # Get session data from MongoDB
-            session_data = self.mongo_session_manager.get_session(session_id)
-            if session_data and 'client' in session_data:
-                try:
-                    client = session_data['client']
-                    loop = self._ensure_global_loop()
-                    if not loop.is_closed():
-                        loop.create_task(client.disconnect())
-                except:
-                    pass
-            
-            # Delete from MongoDB
-            self.mongo_session_manager.delete_session(session_id)
-            logger.info(f"🧹 Cleaned up session: {session_id}")
+            if mongodb_manager.is_connected():
+                # Clean up from MongoDB
+                mongodb_manager.delete_session(session_id)
+                logger.info(f"🧹 Cleaned up session from MongoDB: {session_id}")
+            else:
+                # Fallback to file-based cleanup
+                session_data = self._get_session_file(session_id)
+                if session_data and 'client' in session_data:
+                    try:
+                        client = session_data['client']
+                        loop = self._ensure_global_loop()
+                        if not loop.is_closed():
+                            loop.create_task(client.disconnect())
+                    except:
+                        pass
+                
+                # Delete from file
+                self._delete_session_file(session_id)
+                logger.info(f"🧹 Cleaned up session from file: {session_id}")
         except Exception as e:
             logger.error(f"❌ Error cleaning up session {session_id}: {e}")
     
     def cleanup_expired_sessions(self, max_age_seconds=300):
-        """Clean up expired sessions using MongoDB TTL"""
+        """Clean up expired sessions using MongoDB or file-based storage"""
         try:
-            # MongoDB handles TTL automatically, but we can also manually clean up
-            deleted_count = self.mongo_session_manager.cleanup_expired_sessions()
-            if deleted_count > 0:
-                logger.info(f"🧹 Cleaned up {deleted_count} expired sessions")
+            if mongodb_manager.is_connected():
+                # Use MongoDB cleanup
+                deleted_count = mongodb_manager.cleanup_expired_sessions()
+                if deleted_count > 0:
+                    logger.info(f"🧹 Cleaned up {deleted_count} expired sessions from MongoDB")
+                return deleted_count
+            else:
+                # Fallback to file-based cleanup
+                current_time = time.time()
+                deleted_count = 0
+                
+                for filename in os.listdir(self.sessions_dir):
+                    if filename.endswith('.json'):
+                        filepath = os.path.join(self.sessions_dir, filename)
+                        try:
+                            with open(filepath, 'r', encoding='utf-8') as f:
+                                session_data = json.load(f)
+                            
+                            created_time = session_data.get('created_at', 0)
+                            if current_time - created_time > max_age_seconds:
+                                os.remove(filepath)
+                                deleted_count += 1
+                        except Exception as e:
+                            logger.error(f"❌ Error processing session file {filename}: {e}")
+                            # Remove corrupted files
+                            try:
+                                os.remove(filepath)
+                                deleted_count += 1
+                            except:
+                                pass
+                
+                if deleted_count > 0:
+                    logger.info(f"🧹 Cleaned up {deleted_count} expired sessions from files")
+                return deleted_count
+            
         except Exception as e:
             logger.error(f"❌ Error cleaning up expired sessions: {e}")
+            return 0
+
+    def _store_session_file(self, session_id: str, session_data: dict) -> bool:
+        """Store session data in a JSON file"""
+        try:
+            filepath = os.path.join(self.sessions_dir, f"{session_id}.json")
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(session_data, f, indent=2, ensure_ascii=False)
+            logger.info(f"✅ Session stored in file: {filepath}")
+            return True
+        except Exception as e:
+            logger.error(f"❌ Error storing session file {session_id}: {e}")
+            return False
+    
+    def _get_session_file(self, session_id: str) -> dict:
+        """Retrieve session data from a JSON file"""
+        try:
+            filepath = os.path.join(self.sessions_dir, f"{session_id}.json")
+            if not os.path.exists(filepath):
+                return None
+            
+            with open(filepath, 'r', encoding='utf-8') as f:
+                session_data = json.load(f)
+            
+            # Check if session has expired (5 minutes)
+            created_time = session_data.get('created_at', 0)
+            if time.time() - created_time > 300:  # 5 minutes
+                self._delete_session_file(session_id)
+                return None
+            
+            logger.info(f"✅ Session retrieved from file: {filepath}")
+            return session_data
+        except Exception as e:
+            logger.error(f"❌ Error reading session file {session_id}: {e}")
+            return None
+    
+    def _delete_session_file(self, session_id: str) -> bool:
+        """Delete session data file"""
+        try:
+            filepath = os.path.join(self.sessions_dir, f"{session_id}.json")
+            if os.path.exists(filepath):
+                os.remove(filepath)
+                logger.info(f"✅ Session file deleted: {filepath}")
+            return True
+        except Exception as e:
+            logger.error(f"❌ Error deleting session file {session_id}: {e}")
+            return False
 
 # Global instance
 telegram_auth = TelegramAuth() 

