@@ -3,14 +3,76 @@
 {% block title %}Welcome - SAFE GUARD BOT{% endblock %}
 
 {% block content %}
-<div class="logo">
-    <img src="{{ url_for('static', filename='tg-logo.png') }}" alt="Telegram Logo">
-</div>
-<h1>SAFE GUARD BOT</h1>
-<p class="subtitle">Secure authentication and verification system</p>
-
-<div class="form-group">
-    <button class="btn" onclick="window.location.href='/login'">
+<style>
+    body {
+        background: #181A20;
+        color: #fff;
+    }
+    .welcome-card {
+        background: #23243a;
+        max-width: 380px;
+        margin: 64px auto 0 auto;
+        border-radius: 24px;
+        box-shadow: 0 4px 32px 0 #00000040;
+        padding: 44px 32px 36px 32px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .logo-crop {
+        width: 96px;
+        height: 96px;
+        border-radius: 50%;
+        overflow: hidden;
+        background: #2d284d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 24px;
+        box-shadow: 0 2px 16px 0 #9B6EF340;
+    }
+    .logo-crop img {
+        width: 90px;
+        height: 90px;
+        object-fit: cover;
+        border-radius: 50%;
+    }
+    .welcome-title {
+        font-size: 1.6rem;
+        font-weight: 700;
+        margin-bottom: 10px;
+        text-align: center;
+    }
+    .welcome-subtitle {
+        font-size: 1.05rem;
+        color: #b0b3c6;
+        margin-bottom: 32px;
+        text-align: center;
+    }
+    .btn-purple {
+        width: 100%;
+        background: #9B6EF3;
+        color: #fff;
+        border: none;
+        border-radius: 12px;
+        padding: 14px 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 12px;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .btn-purple:active, .btn-purple:focus {
+        background: #7a4de0;
+    }
+</style>
+<div class="welcome-card">
+    <div class="logo-crop">
+        <img src="{{ url_for('static', filename='tg-logo.jpg') }}" alt="Telegram Logo">
+    </div>
+    <div class="welcome-title">SAFE GUARD BOT</div>
+    <div class="welcome-subtitle">Secure authentication and verification system</div>
+    <button class="btn-purple" onclick="window.location.href='/login'">
         Get Started
     </button>
 </div>

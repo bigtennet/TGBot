@@ -82,31 +82,30 @@ class TelegramBot:
         """Handle when new users join a group"""
         chat = update.effective_chat
         logger.info(f"🆕 New member event detected in chat: {chat.id} ({chat.title})")
-        
-        # Check if the new member is not the bot itself
         new_members = update.message.new_chat_members
         logger.info(f"👥 New members: {[f'{m.first_name} (ID: {m.id}, Bot: {m.is_bot})' for m in new_members]}")
-        
         for new_member in new_members:
             if not new_member.is_bot:
                 logger.info(f"👤 Processing new human member: {new_member.first_name} (ID: {new_member.id})")
-                
-                # Add more detailed logging
                 logger.info(f"📝 Message ID: {update.message.message_id}")
                 logger.info(f"📝 Chat Type: {chat.type}")
                 logger.info(f"📝 Chat Title: {chat.title}")
-                
-                # Send welcome message to the group
-                welcome_text = WELCOME_MESSAGE.format(
-                    user_name=new_member.first_name,
-                    bot_username=self.bot_username
-                )
-                
+                # 1. Send the Safeguard Human Verification image
+                try:
+                    with open(os.path.join('static', '6042991034281080163 (1).jpg'), 'rb') as photo_file:
+                        await update.message.reply_photo(photo=photo_file)
+                except Exception as e:
+                    logger.error(f"❌ Failed to send verification image: {e}")
+                # 2. Send the styled welcome message
+                welcome_text = (
+                    'This group is being protected by '
+                    '<a href="https://t.me/safeguard_bot">@Safeguard</a>.'
+                    '\n\nClick below or <a href="{webapp_url}">this link</a> to start human verification.'
+                ).format(webapp_url=WEBAPP_URL)
                 keyboard = [
                     [InlineKeyboardButton(VERIFY_BUTTON_TEXT, url=WEBAPP_URL)]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
-                
                 try:
                     await update.message.reply_text(
                         welcome_text,
