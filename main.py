@@ -552,12 +552,17 @@ if __name__ == '__main__':
     print("📱 Phone authentication: ENABLED")
     print("🔐 5-digit verification codes: ENABLED")
     print("📋 Paste functionality: ENABLED")
-    print("🌐 Web app running at: http://127.0.0.1:5000")
+    
+    # Get port from environment variable (for deployment) or use default
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_ENV') == 'development'
+    
+    print(f"🌐 Web app running at: http://127.0.0.1:{port}")
     print("📝 Logs will be saved to: safeguard_bot.log")
     print("=" * 50)
     
     try:
-        app.run(debug=True, host='0.0.0.0', port=5000)
+        app.run(debug=debug, host='0.0.0.0', port=port)
     except KeyboardInterrupt:
         print("\n🛑 Shutting down...")
         # Clean up all active sessions
