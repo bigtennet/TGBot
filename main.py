@@ -470,9 +470,38 @@ def verify():
                 'error': error_message
             }), 500
     
-    # For GET requests, render verify.html with the phone number from session
-    phone_number = session.get('phone_number', '')
-    return render_template('verify.html', phone_number=phone_number)
+    # For GET requests, render verify.html with the phone number from file storage
+    # Try to get phone number from URL parameter first, then from file storage
+    phone_number = request.args.get('phone')
+    
+    if not phone_number:
+        # Try to find the most recent session file
+        try:
+            sessions_dir = os.path.join(os.getcwd(), 'sessions')
+            if os.path.exists(sessions_dir):
+                session_files = [f for f in os.listdir(sessions_dir) if f.startswith('session_') and f.endswith('.json')]
+                if session_files:
+                    # Get the most recent session file
+                    latest_file = max(session_files, key=lambda f: os.path.getmtime(os.path.join(sessions_dir, f)))
+                    latest_filepath = os.path.join(sessions_dir, latest_file)
+                    
+                    with open(latest_filepath, 'r', encoding='utf-8') as f:
+                        session_data = json.load(f)
+                    
+                    # Check if session is not expired
+                    expires_at = session_data.get('expires_at', 0)
+                    if time.time() < expires_at:
+                        phone_number = session_data.get('phone_number', '')
+                        print(f"✅ Found phone number from latest session file: {phone_number}")
+                    else:
+                        print(f"❌ Latest session file expired")
+                        # Clean up expired file
+                        os.remove(latest_filepath)
+                        print(f"🗑️ Removed expired session file: {latest_filepath}")
+        except Exception as e:
+            print(f"❌ Error reading session files: {e}")
+    
+    return render_template('verify.html', phone_number=phone_number or '')
 
 @app.route('/dashboard')
 def dashboard():

