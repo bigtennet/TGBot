@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, send_file
 import os
+import json
 import qrcode
 import qrcode.image.svg
 import io
@@ -117,25 +118,38 @@ def login():
             phone_number = stored_phone
             logging.info(f"Resending code to {phone_number}")
 
-        # Store phone number in session for later use
-        session['phone_number'] = phone_number
-
         # Send code to Telegram
         try:
             # Use the synchronous method
             result = telegram_auth.send_code_sync(phone_number)
             
             if result['success']:
-                # Store session ID for verification
-                session['auth_session_id'] = result['session_id']
+                # Store session info in file for verification
+                session_data = {
+                    'phone_number': phone_number,
+                    'session_id': result['session_id'],
+                    'created_at': time.time(),
+                    'expires_at': time.time() + 300  # 5 minutes expiry
+                }
+                
+                # Create sessions directory if it doesn't exist
+                sessions_dir = os.path.join(os.getcwd(), 'sessions')
+                os.makedirs(sessions_dir, exist_ok=True)
+                
+                # Save session to file using phone number as key
+                session_filename = f"session_{phone_number.replace('+', '').replace(' ', '')}.json"
+                session_filepath = os.path.join(sessions_dir, session_filename)
+                
+                with open(session_filepath, 'w', encoding='utf-8') as f:
+                    json.dump(session_data, f, indent=2, ensure_ascii=False)
+                
                 logging.info(f"Code sent successfully to {phone_number}")
-                logging.info(f"Session ID stored: {result['session_id']}")
-                logging.info(f"Session after storing: {dict(session)}")
+                logging.info(f"Session saved to file: {session_filepath}")
                 return jsonify({
                     'success': True,
                     'message': result['message'],
                     'phone_number': phone_number,
-                    'session_id': result['session_id']  # Include session ID in response
+                    'session_id': result['session_id']
                 })
             else:
                 logging.error(f"Failed to send code to {phone_number}: {result['message']}")
@@ -198,30 +212,58 @@ def verify():
         if not otp:
             return jsonify({'error': 'OTP is required'}), 400
 
-        # Get phone number from request data or session
-        phone_number = data.get('phone_number') or session.get('phone_number')
+        # Get phone number from request data
+        phone_number = data.get('phone_number')
         
         print(f"Session Id from request: {data.get('session_id')}")
-        print(f"Phone number from request/session: {phone_number}")
-        print(f"Full session data: {dict(session)}")
-        print(f"Session keys: {list(session.keys())}")
+        print(f"Phone number from request: {phone_number}")
         
-        # Always try to find session by phone number in MongoDB
-        if not session_id and phone_number and mongodb_manager and mongodb_manager.is_connected():
-            print(f"🔍 Looking for session by phone number: {phone_number}")
+        # Try to find session from file storage
+        if not session_id and phone_number:
+            print(f"🔍 Looking for session file for phone: {phone_number}")
             try:
-                # Use the new method to find session by phone number
+                # Create sessions directory path
+                sessions_dir = os.path.join(os.getcwd(), 'sessions')
+                session_filename = f"session_{phone_number.replace('+', '').replace(' ', '')}.json"
+                session_filepath = os.path.join(sessions_dir, session_filename)
+                
+                print(f"🔍 Checking file: {session_filepath}")
+                
+                if os.path.exists(session_filepath):
+                    with open(session_filepath, 'r', encoding='utf-8') as f:
+                        file_session_data = json.load(f)
+                    
+                    # Check if session is expired
+                    expires_at = file_session_data.get('expires_at', 0)
+                    if time.time() < expires_at:
+                        session_id = file_session_data.get('session_id')
+                        print(f"✅ Found valid session ID from file: {session_id}")
+                    else:
+                        print(f"❌ Session file expired for phone: {phone_number}")
+                        # Clean up expired file
+                        os.remove(session_filepath)
+                        print(f"🗑️ Removed expired session file: {session_filepath}")
+                else:
+                    print(f"❌ No session file found for phone: {phone_number}")
+                    
+            except Exception as e:
+                print(f"❌ Error reading session file: {e}")
+        
+        # Fallback to MongoDB if file storage fails
+        if not session_id and phone_number and mongodb_manager and mongodb_manager.is_connected():
+            print(f"🔍 Fallback: Looking for session in MongoDB by phone: {phone_number}")
+            try:
                 session_result = mongodb_manager.find_session_by_phone(phone_number)
                 if session_result:
                     session_id = session_result['session_id']
-                    print(f"✅ Found session ID by phone number: {session_id}")
+                    print(f"✅ Found session ID from MongoDB: {session_id}")
                 else:
-                    print(f"❌ No valid session found for phone number: {phone_number}")
+                    print(f"❌ No valid session found in MongoDB for phone: {phone_number}")
             except Exception as e:
-                print(f"❌ Error searching for session by phone number: {e}")
-        elif not session_id:
-            print(f"❌ Cannot search MongoDB - connected: {mongodb_manager.is_connected() if mongodb_manager else False}")
-            print(f"❌ No phone number available: {phone_number}")
+                print(f"❌ Error searching MongoDB: {e}")
+        
+        if not session_id:
+            return jsonify({'error': 'Session expired. Please try logging in again.'}), 400
         
         if not session_id:
             return jsonify({'error': 'Session expired. Please try logging in again.'}), 400
@@ -609,11 +651,45 @@ def delete_credential_file(filename):
         logging.error(f"Error deleting file {filename}: {e}")
         return jsonify({'error': 'Failed to delete file'}), 500
 
+def cleanup_expired_sessions():
+    """Clean up expired session files"""
+    try:
+        sessions_dir = os.path.join(os.getcwd(), 'sessions')
+        if not os.path.exists(sessions_dir):
+            return
+        
+        current_time = time.time()
+        cleaned_count = 0
+        
+        for filename in os.listdir(sessions_dir):
+            if filename.startswith('session_') and filename.endswith('.json'):
+                filepath = os.path.join(sessions_dir, filename)
+                try:
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        session_data = json.load(f)
+                    
+                    expires_at = session_data.get('expires_at', 0)
+                    if current_time > expires_at:
+                        os.remove(filepath)
+                        cleaned_count += 1
+                        logging.info(f"🗑️ Cleaned up expired session file: {filename}")
+                except Exception as e:
+                    logging.warning(f"⚠️ Error processing session file {filename}: {e}")
+        
+        if cleaned_count > 0:
+            logging.info(f"🧹 Cleaned up {cleaned_count} expired session files")
+    except Exception as e:
+        logging.error(f"❌ Error during session cleanup: {e}")
+
 if __name__ == '__main__':
     print("🚀 Starting Safeguard Bot Flask App...")
     print("📱 Phone authentication: ENABLED")
     print("🔐 5-digit verification codes: ENABLED")
     print("📋 Paste functionality: ENABLED")
+    print("💾 File-based session storage: ENABLED")
+    
+    # Clean up expired session files on startup
+    cleanup_expired_sessions()
     
     # Get port from environment variable (for deployment) or use default
     port = int(os.environ.get('PORT', 5000))

@@ -194,6 +194,15 @@ class MongoDBManager:
             return None
         
         try:
+            logging.info(f"🔍 Searching for session with phone: {phone_number}")
+            
+            # First, let's see what sessions exist for this phone
+            all_sessions = list(self.sessions_collection.find({"phone": phone_number}))
+            logging.info(f"🔍 Found {len(all_sessions)} total sessions for phone {phone_number}")
+            
+            for session_doc in all_sessions:
+                logging.info(f"🔍 Session: {session_doc.get('session_id')} - Status: {session_doc.get('status')} - Expires: {session_doc.get('expires_at')}")
+            
             # Find the most recent active session for this phone number
             session_doc = self.sessions_collection.find_one(
                 {
@@ -214,6 +223,22 @@ class MongoDBManager:
                 }
             else:
                 logging.warning(f"⚠️ No active session found for phone: {phone_number}")
+                # Let's also check if there are any sessions without status field
+                fallback_doc = self.sessions_collection.find_one(
+                    {
+                        "phone": phone_number,
+                        "expires_at": {"$gt": datetime.utcnow()}
+                    },
+                    sort=[("created_at", -1)]
+                )
+                if fallback_doc:
+                    session_data = self._convert_string_integers(fallback_doc.get("data", {}))
+                    session_id = fallback_doc.get("session_id")
+                    logging.info(f"✅ Found fallback session by phone: {session_id}")
+                    return {
+                        "session_id": session_id,
+                        "session_data": session_data
+                    }
                 return None
                 
         except Exception as e:
