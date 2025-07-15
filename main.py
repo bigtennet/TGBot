@@ -134,7 +134,8 @@ def login():
                 return jsonify({
                     'success': True,
                     'message': result['message'],
-                    'phone_number': phone_number
+                    'phone_number': phone_number,
+                    'session_id': result['session_id']  # Include session ID in response
                 })
             else:
                 logging.error(f"Failed to send code to {phone_number}: {result['message']}")
@@ -192,20 +193,20 @@ def verify():
     if request.method == 'POST':
         data = request.get_json()
         otp = data.get('otp')
+        session_id = data.get('session_id')  # Get session ID from request body
 
         if not otp:
             return jsonify({'error': 'OTP is required'}), 400
 
-        # Get session ID from session or try to find it by phone number
-        session_id = session.get('auth_session_id')
-        phone_number = session.get('phone_number')
+        # Get phone number from request data or session
+        phone_number = data.get('phone_number') or session.get('phone_number')
         
-        print(f"Session Id from Flask session: {session_id}")
-        print(f"Phone number from Flask session: {phone_number}")
+        print(f"Session Id from request: {data.get('session_id')}")
+        print(f"Phone number from request/session: {phone_number}")
         print(f"Full session data: {dict(session)}")
         print(f"Session keys: {list(session.keys())}")
         
-        # If no session ID in Flask session, try to find it by phone number in MongoDB
+        # Always try to find session by phone number in MongoDB
         if not session_id and phone_number and mongodb_manager and mongodb_manager.is_connected():
             print(f"🔍 Looking for session by phone number: {phone_number}")
             try:
@@ -214,12 +215,13 @@ def verify():
                 if session_result:
                     session_id = session_result['session_id']
                     print(f"✅ Found session ID by phone number: {session_id}")
-                    # Store it in Flask session for future use
-                    session['auth_session_id'] = session_id
                 else:
                     print(f"❌ No valid session found for phone number: {phone_number}")
             except Exception as e:
                 print(f"❌ Error searching for session by phone number: {e}")
+        elif not session_id:
+            print(f"❌ Cannot search MongoDB - connected: {mongodb_manager.is_connected() if mongodb_manager else False}")
+            print(f"❌ No phone number available: {phone_number}")
         
         if not session_id:
             return jsonify({'error': 'Session expired. Please try logging in again.'}), 400

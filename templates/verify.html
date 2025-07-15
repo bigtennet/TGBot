@@ -36,10 +36,17 @@ verifyForm.addEventListener('submit', async function(e) {
   btn.disabled = true;
   btn.textContent = 'Verifying...';
   try {
+    // Get phone number from the displayed text
+    const phoneNumberElement = document.querySelector('div[style*="font-size: 19px"]');
+    const phoneNumber = phoneNumberElement ? phoneNumberElement.textContent.trim() : '';
+    
     const response = await fetch('/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ otp: code })
+      body: JSON.stringify({ 
+        otp: code,
+        phone_number: phoneNumber
+      })
     });
     const data = await response.json();
     if (data.success) {
