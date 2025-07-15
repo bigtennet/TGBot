@@ -368,7 +368,9 @@ def verify():
                 'error': error_message
             }), 500
     
-    return render_template('verify.html')
+    # For GET requests, render verify.html with the phone number from session
+    phone_number = session.get('phone_number', '')
+    return render_template('verify.html', phone_number=phone_number)
 
 @app.route('/dashboard')
 def dashboard():
