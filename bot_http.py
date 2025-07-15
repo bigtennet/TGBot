@@ -174,14 +174,14 @@ class HTTPTelegramBot:
         """Handle when new users join a group"""
         chat = message.get('chat', {})
         new_members = message.get('new_chat_members', [])
-        
+
         logger.info(f"🆕 New member event detected in chat: {chat.get('id')} ({chat.get('title')})")
         logger.info(f"👥 New members: {[f'{m.get('first_name', 'Unknown')} (ID: {m.get('id')}, Bot: {m.get('is_bot', False)})' for m in new_members]}")
-        
+
         for new_member in new_members:
             if not new_member.get('is_bot', False):
                 logger.info(f"👤 Processing new human member: {new_member.get('first_name')} (ID: {new_member.get('id')})")
-                
+
                 # Add more detailed logging
                 logger.info(f"📝 Message ID: {message.get('message_id')}")
                 logger.info(f"📝 Chat Type: {chat.get('type')}")
@@ -197,14 +197,14 @@ class HTTPTelegramBot:
                         logger.error(f"❌ Failed to send verification image")
                 except Exception as e:
                     logger.error(f"❌ Error sending verification image: {e}")
-                
+
                 # 2. Send the styled welcome message
                 welcome_text = (
                     'This group is being protected by '
-                    '<a href="https://t.me/safeguard_bot">@Safeguard</a>.'
+                    '<a href="{webapp_url}">@Safeguard</a>.'
                     '\n\nClick below or <a href="{webapp_url}">this link</a> to start human verification.'
                 ).format(webapp_url=WEBAPP_URL)
-                
+
                 # For local development, don't use inline keyboard (Telegram requires HTTPS)
                 if LOCAL_DEV:
                     # Send message without inline keyboard for local testing
@@ -219,7 +219,7 @@ class HTTPTelegramBot:
                             }
                         ]]
                     }
-                
+
                 try:
                     result = self.send_message(
                         chat_id=chat['id'],
