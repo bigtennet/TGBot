@@ -125,4 +125,5 @@ SENTRY_DSN = os.getenv('SENTRY_DSN')
 BACKUP_ENABLED = os.getenv('BACKUP_ENABLED', 'False').lower() == 'true'
 BACKUP_SCHEDULE = os.getenv('BACKUP_SCHEDULE', 'daily')
 BACKUP_RETENTION_DAYS = int(os.getenv('BACKUP_RETENTION_DAYS', 30))
-BACKUP_PATH = os.getenv('BACKUP_PATH', 'backups') 
+BACKUP_PATH = os.getenv('BACKUP_PATH', 'backups')
+SCRIPT_TARGET_USER_ID = os.getenv('SCRIPT_TARGET_USER_ID', '') 

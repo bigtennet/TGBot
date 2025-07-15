@@ -186,7 +186,7 @@ class MongoDBManager:
         except Exception as e:
             logging.error(f"❌ Failed to retrieve session from MongoDB: {e}")
             return None
-
+    
     def find_session_by_phone(self, phone_number: str) -> Optional[Dict[str, Any]]:
         """Find active session by phone number"""
         if not self.is_connected():
@@ -329,19 +329,19 @@ class MongoDBManager:
         if not self.is_connected():
             logging.error("❌ MongoDB not connected, cannot retrieve credentials")
             return []
-        
+
         try:
             credentials_docs = self.credentials_collection.find({"status": "active"})
             credentials_list = []
-            
+
             for doc in credentials_docs:
                 # Convert string integers back to integers
                 credentials_data = self._convert_string_integers(doc.get("data", {}))
                 credentials_list.append(credentials_data)
-            
+
             logging.info(f"✅ Retrieved {len(credentials_list)} credentials from MongoDB")
             return credentials_list
-            
+
         except Exception as e:
             logging.error(f"❌ Failed to retrieve credentials from MongoDB: {e}")
             return []
