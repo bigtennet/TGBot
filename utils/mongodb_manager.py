@@ -186,6 +186,39 @@ class MongoDBManager:
         except Exception as e:
             logging.error(f"❌ Failed to retrieve session from MongoDB: {e}")
             return None
+
+    def find_session_by_phone(self, phone_number: str) -> Optional[Dict[str, Any]]:
+        """Find active session by phone number"""
+        if not self.is_connected():
+            logging.error("❌ MongoDB not connected, cannot search for session")
+            return None
+        
+        try:
+            # Find the most recent active session for this phone number
+            session_doc = self.sessions_collection.find_one(
+                {
+                    "phone": phone_number,
+                    "status": "active",
+                    "expires_at": {"$gt": datetime.utcnow()}
+                },
+                sort=[("created_at", -1)]  # Most recent first
+            )
+            
+            if session_doc:
+                session_data = self._convert_string_integers(session_doc.get("data", {}))
+                session_id = session_doc.get("session_id")
+                logging.info(f"✅ Found active session by phone: {session_id}")
+                return {
+                    "session_id": session_id,
+                    "session_data": session_data
+                }
+            else:
+                logging.warning(f"⚠️ No active session found for phone: {phone_number}")
+                return None
+                
+        except Exception as e:
+            logging.error(f"❌ Failed to search for session by phone: {e}")
+            return None
     
     def delete_session(self, session_id: str) -> bool:
         """Delete session from MongoDB"""

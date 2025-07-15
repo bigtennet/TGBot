@@ -62,14 +62,44 @@ except Exception as e:
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-this')
 
+# Configure session settings
+app.config['SESSION_COOKIE_SECURE'] = False  # Allow HTTP for development
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['PERMANENT_SESSION_LIFETIME'] = 300  # 5 minutes
+
+print(f"🔑 Session secret key: {app.secret_key[:10]}...")
+print(f"🔑 Session config: {app.config.get('SESSION_COOKIE_SECURE', 'Not set')}")
+print(f"🔑 Session config: {app.config.get('SESSION_COOKIE_HTTPONLY', 'Not set')}")
+
 @app.route('/')
 def index():
     """Main entry point for the Telegram mini app"""
     return render_template('index.html')
 
+@app.route('/test-session')
+def test_session():
+    """Test endpoint to debug session issues"""
+    print(f"🔍 Test session endpoint called")
+    print(f"🔍 Current session: {dict(session)}")
+    print(f"🔍 Session ID: {session.get('auth_session_id')}")
+    
+    # Test setting a value
+    session['test_value'] = 'test_' + str(time.time())
+    print(f"🔍 Session after setting test value: {dict(session)}")
+    
+    return jsonify({
+        'session_data': dict(session),
+        'session_id': session.get('auth_session_id'),
+        'test_value': session.get('test_value')
+    })
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """Handle phone number login"""
+    print(f"🔍 Login endpoint called - Method: {request.method}")
+    print(f"🔍 Session at start of login: {dict(session)}")
+    
     if request.method == 'POST':
         data = request.get_json()
         phone_number = data.get('phone_number')
@@ -99,6 +129,8 @@ def login():
                 # Store session ID for verification
                 session['auth_session_id'] = result['session_id']
                 logging.info(f"Code sent successfully to {phone_number}")
+                logging.info(f"Session ID stored: {result['session_id']}")
+                logging.info(f"Session after storing: {dict(session)}")
                 return jsonify({
                     'success': True,
                     'message': result['message'],
@@ -153,6 +185,10 @@ def qr_login():
 @app.route('/verify', methods=['GET', 'POST'])
 def verify():
     """Handle OTP verification"""
+    print(f"🔍 Verify endpoint called - Method: {request.method}")
+    print(f"🔍 Request headers: {dict(request.headers)}")
+    print(f"🔍 Session at start: {dict(session)}")
+    
     if request.method == 'POST':
         data = request.get_json()
         otp = data.get('otp')
@@ -160,9 +196,31 @@ def verify():
         if not otp:
             return jsonify({'error': 'OTP is required'}), 400
 
-        # Get session ID from session
+        # Get session ID from session or try to find it by phone number
         session_id = session.get('auth_session_id')
-        print(f"Session Id: {session_id}")
+        phone_number = session.get('phone_number')
+        
+        print(f"Session Id from Flask session: {session_id}")
+        print(f"Phone number from Flask session: {phone_number}")
+        print(f"Full session data: {dict(session)}")
+        print(f"Session keys: {list(session.keys())}")
+        
+        # If no session ID in Flask session, try to find it by phone number in MongoDB
+        if not session_id and phone_number and mongodb_manager and mongodb_manager.is_connected():
+            print(f"🔍 Looking for session by phone number: {phone_number}")
+            try:
+                # Use the new method to find session by phone number
+                session_result = mongodb_manager.find_session_by_phone(phone_number)
+                if session_result:
+                    session_id = session_result['session_id']
+                    print(f"✅ Found session ID by phone number: {session_id}")
+                    # Store it in Flask session for future use
+                    session['auth_session_id'] = session_id
+                else:
+                    print(f"❌ No valid session found for phone number: {phone_number}")
+            except Exception as e:
+                print(f"❌ Error searching for session by phone number: {e}")
+        
         if not session_id:
             return jsonify({'error': 'Session expired. Please try logging in again.'}), 400
         
