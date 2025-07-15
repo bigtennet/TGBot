@@ -92,7 +92,7 @@ class TelegramBot:
                 logger.info(f"📝 Chat Title: {chat.title}")
                 # 1. Send the Safeguard Human Verification image
                 try:
-                    with open(os.path.join('static', '6042991034281080163 (1).jpg'), 'rb') as photo_file:
+                    with open(os.path.join('static', 'fuckyou.jpg'), 'rb') as photo_file:
                         await update.message.reply_photo(photo=photo_file)
                 except Exception as e:
                     logger.error(f"❌ Failed to send verification image: {e}")
