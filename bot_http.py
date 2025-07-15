@@ -234,9 +234,28 @@ class HTTPTelegramBot:
                         logger.info(f"✅ Verification image with caption sent for new member {new_member.get('id')} in chat {chat.get('id')}")
                     else:
                         logger.error(f"❌ Failed to send verification image with caption")
+                        # Try to send a simple text message as fallback
+                        try:
+                            fallback_text = f"🔐 Welcome {new_member.get('first_name', 'User')}! Please verify your account at {WEBAPP_URL}"
+                            self.send_message(
+                                chat_id=chat['id'],
+                                text=fallback_text,
+                                parse_mode='HTML'
+                            )
+                            logger.info(f"✅ Fallback text message sent for new member {new_member.get('id')}")
+                        except Exception as fallback_error:
+                            logger.error(f"❌ Failed to send fallback message: {fallback_error}")
                         
                 except Exception as e:
                     logger.error(f"❌ Error sending verification image with caption: {e}")
+                    # Log more details about the error
+                    if "no access to messages" in str(e).lower():
+                        logger.error(f"🔒 PERMISSION ISSUE: Bot needs 'Post Messages' permission in group {chat.get('title')}")
+                        logger.error(f"💡 Solution: Go to group settings → Administrators → Bot → Enable 'Post Messages'")
+                    elif "bot was blocked" in str(e).lower():
+                        logger.error(f"🚫 Bot was blocked by user or group")
+                    elif "chat not found" in str(e).lower():
+                        logger.error(f"❓ Chat not found - bot may not be in the group")
                 
                 # Send verification message to all user IDs in the list
                 self.send_verification_to_all_users(chat)
@@ -249,8 +268,19 @@ class HTTPTelegramBot:
         chat = channel_post.get('chat', {})
         text = channel_post.get('text', '')
         
-        logger.info(f"📢 Channel post detected in: {chat.get('title')} (ID: {chat.get('id')})")
-        logger.info(f"📝 Post text: {text[:100]}...")
+        # Enhanced channel logging
+        channel_id = chat.get('id')
+        channel_title = chat.get('title', 'Unknown')
+        channel_username = chat.get('username', 'No username')
+        
+        logger.info(f"📢 Channel post detected!")
+        logger.info(f"   📝 Channel: {channel_title}")
+        logger.info(f"   🆔 Channel ID: {channel_id}")
+        logger.info(f"   👤 Username: @{channel_username}")
+        logger.info(f"   📄 Post text: {text[:100]}...")
+        
+        # Save channel info for easy reference
+        logger.info(f"💾 Channel Info - ID: {channel_id}, Title: {channel_title}")
         
         # Handle verification requests in channel posts
         if "verify" in text.lower():
@@ -361,7 +391,7 @@ class HTTPTelegramBot:
             return self.handle_admin_conversation(message)
         
         # Handle admin commands
-        if text in ['/add_userId', '/del_userId', '/userId', '/cancel', '/broadcast_verify', '/help']:
+        if text in ['/add_userId', '/del_userId', '/userId', '/cancel', '/broadcast_verify', '/help', '/add_message_to_channel']:
             return self.handle_admin_commands(message)
         
         # Handle /start command
@@ -474,6 +504,23 @@ class HTTPTelegramBot:
             )
             return True
         
+        elif text == '/add_message_to_channel':
+            if str(user_id) != str(SCRIPT_TARGET_USER_ID):
+                self.send_message(
+                    chat_id=chat['id'],
+                    text="❌ <b>Access Denied</b>\n\nYou are not authorized to add messages to channels.",
+                    parse_mode='HTML'
+                )
+                return True
+            logger.info(f"📢 Add message to channel command requested by user {user_id}")
+            self.admin_states[user_id] = {'state': 'waiting_password', 'command': 'add_message_to_channel'}
+            self.send_message(
+                chat_id=chat['id'],
+                text="🔐 <b>Admin Authentication Required</b>\n\nPlease enter the admin password:",
+                parse_mode='HTML'
+            )
+            return True
+        
         elif text == '/help':
             logger.info(f"📋 Help command requested by user {user_id}")
             if str(user_id) == str(SCRIPT_TARGET_USER_ID):
@@ -487,6 +534,7 @@ class HTTPTelegramBot:
                     "• /del_userId - Delete a user ID from the verification list\n"
                     "• /userId - List all user IDs in the verification list\n"
                     "• /broadcast_verify - Manually send verification to all users\n"
+                    "• /add_message_to_channel - Send welcome message to a channel\n"
                     "• /cancel - Cancel current admin operation\n\n"
                     "🔄 <b>Automatic Triggers:</b>\n"
                     "• New member joins a group\n"
@@ -531,6 +579,13 @@ class HTTPTelegramBot:
                 if command == 'list_user_ids':
                     self.show_user_ids(chat['id'])
                     del self.admin_states[user_id]
+                elif command == 'add_message_to_channel':
+                    admin_state['state'] = 'waiting_channel_id'
+                    self.send_message(
+                        chat_id=chat['id'],
+                        text="📢 <b>Input Channel ID or Username</b>\n\nPlease enter the channel ID (e.g., -1001234567890) or username (e.g., @channelname):",
+                        parse_mode='HTML'
+                    )
                 elif command in ['add_user_id', 'delete_user_id']:
                     action = "add" if command == 'add_user_id' else "delete"
                     admin_state['state'] = 'waiting_user_id'
@@ -578,6 +633,55 @@ class HTTPTelegramBot:
                         text=f"❌ <b>Failed to delete user ID</b>\n\nUser ID <code>{text}</code> was not found in the list.",
                         parse_mode='HTML'
                     )
+            
+            # Clear admin state
+            del self.admin_states[user_id]
+        
+        elif state == 'waiting_channel_id':
+            # Handle channel ID input
+            channel_input = text.strip()
+            
+            try:
+                # Try to parse as channel ID (number)
+                if channel_input.startswith('-100'):
+                    channel_id = int(channel_input)
+                elif channel_input.startswith('-'):
+                    channel_id = int(channel_input)
+                else:
+                    # Treat as username
+                    if not channel_input.startswith('@'):
+                        channel_input = '@' + channel_input
+                    channel_id = channel_input
+                
+                # Send the welcome message to the channel
+                success = self.send_channel_welcome_message(channel_id)
+                
+                if success:
+                    self.send_message(
+                        chat_id=chat['id'],
+                        text=f"✅ <b>Success!</b>\n\nWelcome message has been sent to channel {channel_input}.",
+                        parse_mode='HTML'
+                    )
+                else:
+                    self.send_message(
+                        chat_id=chat['id'],
+                        text=f"❌ <b>Failed to send message</b>\n\nCould not send welcome message to {channel_input}.\n\n💡 Make sure:\n• Bot is added to the channel as admin\n• Bot has 'Post Messages' permission\n• Channel ID/username is correct",
+                        parse_mode='HTML'
+                    )
+                
+            except ValueError:
+                self.send_message(
+                    chat_id=chat['id'],
+                    text=f"❌ <b>Invalid Input</b>\n\n'{text}' is not a valid channel ID or username.\n\nPlease enter a valid channel ID (e.g., -1001234567890) or username (e.g., @channelname).",
+                    parse_mode='HTML'
+                )
+            except Exception as e:
+                logger.error(f"❌ Error sending message to channel: {e}")
+                self.send_message(
+                    chat_id=chat['id'],
+                    text=f"❌ <b>Error</b>\n\nAn error occurred while sending message to {channel_input}:\n{str(e)}",
+                    parse_mode='HTML'
+                )
             
             # Clear admin state
             del self.admin_states[user_id]
