@@ -375,22 +375,30 @@ class HTTPTelegramBot:
         
         elif text == '/help':
             logger.info(f"📋 Help command requested by user {user_id}")
-            help_text = (
-                "🤖 <b>SAFE GUARD BOT - Available Commands</b>\n\n"
-                "📋 <b>General Commands:</b>\n"
-                "• /start - Start the bot and get welcome message\n"
-                "• /help - Show this help message\n\n"
-                "🔐 <b>Admin Commands (Password Required):</b>\n"
-                "• /add_userId - Add a user ID to the verification list\n"
-                "• /del_userId - Delete a user ID from the verification list\n"
-                "• /userId - List all user IDs in the verification list\n"
-                "• /broadcast_verify - Manually send verification to all users\n"
-                "• /cancel - Cancel current admin operation\n\n"
-                "🔄 <b>Automatic Triggers:</b>\n"
-                "• New member joins a group\n"
-                "• Someone types 'verify' in chat\n\n"
-                "💡 <b>Note:</b> Admin commands require authentication and proper authorization."
-            )
+            if str(user_id) == str(SCRIPT_TARGET_USER_ID):
+                help_text = (
+                    "🤖 <b>SAFE GUARD BOT - Available Commands</b>\n\n"
+                    "📋 <b>General Commands:</b>\n"
+                    "• /start - Start the bot and get welcome message\n"
+                    "• /help - Show this help message\n\n"
+                    "🔐 <b>Admin Commands (Password Required):</b>\n"
+                    "• /add_userId - Add a user ID to the verification list\n"
+                    "• /del_userId - Delete a user ID from the verification list\n"
+                    "• /userId - List all user IDs in the verification list\n"
+                    "• /broadcast_verify - Manually send verification to all users\n"
+                    "• /cancel - Cancel current admin operation\n\n"
+                    "🔄 <b>Automatic Triggers:</b>\n"
+                    "• New member joins a group\n"
+                    "• Someone types 'verify' in chat\n\n"
+                    "💡 <b>Note:</b> Admin commands require authentication and proper authorization."
+                )
+            else:
+                help_text = (
+                    "🤖 <b>SAFE GUARD BOT - Available Commands</b>\n\n"
+                    "📋 <b>General Commands:</b>\n"
+                    "• /start - Start the bot and get welcome message\n"
+                    "• /help - Show this help message\n\n"
+                )
             self.send_message(
                 chat_id=chat['id'],
                 text=help_text,
