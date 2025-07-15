@@ -142,11 +142,14 @@ class MongoDBManager:
             processed_data = self._convert_long_integers(session_data)
             
             # Add metadata
+            from datetime import timedelta
+            
+            current_time = datetime.utcnow()
             session_doc = {
                 "session_id": session_id,
                 "data": processed_data,
-                "created_at": datetime.utcnow(),
-                "expires_at": datetime.utcnow().replace(hour=datetime.utcnow().hour + 1),  # 1 hour expiry
+                "created_at": current_time,
+                "expires_at": current_time + timedelta(hours=1),  # 1 hour expiry
                 "phone": session_data.get('phone', ''),
                 "status": "active"
             }
