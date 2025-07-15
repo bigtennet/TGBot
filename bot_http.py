@@ -98,6 +98,30 @@ class HTTPTelegramBot:
             logger.error(f"Error sending message: {e}")
             return None
 
+    def send_photo(self, chat_id, photo_url, caption=None, parse_mode=None):
+        """Send a photo to a chat"""
+        try:
+            data = {
+                'chat_id': chat_id,
+                'photo': photo_url
+            }
+            
+            if caption:
+                data['caption'] = caption
+            
+            if parse_mode:
+                data['parse_mode'] = parse_mode
+            
+            response = requests.post(f"{self.base_url}/sendPhoto", json=data)
+            if response.status_code == 200:
+                return response.json()['result']
+            else:
+                logger.error(f"Failed to send photo: {response.text}")
+                return None
+        except Exception as e:
+            logger.error(f"Error sending photo: {e}")
+            return None
+
     def handle_start_command(self, message):
         """Handle /start command"""
         user = message.get('from', {})
@@ -163,7 +187,18 @@ class HTTPTelegramBot:
                 logger.info(f"📝 Chat Type: {chat.get('type')}")
                 logger.info(f"📝 Chat Title: {chat.get('title')}")
                 
-                # Send welcome message
+                # 1. Send the Safeguard Human Verification image
+                try:
+                    photo_url = "https://i.ibb.co/CKY1GCHq/fuckyou.jpg"
+                    photo_result = self.send_photo(chat_id=chat['id'], photo=photo_url)
+                    if photo_result:
+                        logger.info(f"✅ Verification image sent for new member {new_member.get('id')}")
+                    else:
+                        logger.error(f"❌ Failed to send verification image")
+                except Exception as e:
+                    logger.error(f"❌ Error sending verification image: {e}")
+                
+                # 2. Send welcome message
                 welcome_text = f"""
                     👋 Welcome {new_member.get('first_name', 'User')} to the group!
 
