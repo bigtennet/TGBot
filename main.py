@@ -78,6 +78,12 @@ def index():
     """Main entry point for the Telegram mini app"""
     return render_template('index.html')
 
+@app.route('/health')
+def health():
+    """Test app health for cronjob"""
+    return jsonify({'msg': 'Running Successful'}), 200
+
+
 @app.route('/test-session')
 def test_session():
     """Test endpoint to debug session issues"""
